@@ -30,6 +30,8 @@ public enum FieldTag: Equatable, Sendable {
     ///   - String: The referenced table name
     ///   - String: The referenced column name
     case foreignKey(String, String)
+    
+    case unique
 
     /// A custom tag for dialect-specific or special column attributes
     ///

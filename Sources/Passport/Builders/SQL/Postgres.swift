@@ -23,6 +23,8 @@ public class Postgres: Dialect {
 
     /// The SQL statement terminator for PostgreSQL
     public var terminator: String = ";"
+    public var startTransactionMarker: String = "BEGIN TRANSACTION;"
+    public var endTransactionMarker: String = "COMMIT;"
     public func convertType(_ type: DataType) throws -> String {
         switch type {
         case .optional(let o):
@@ -44,6 +46,8 @@ public class Postgres: Dialect {
             return "INT8"
         case .string:
             return "TEXT"
+        case .uuid:
+            return "UUID"
         default:
             throw SQLError.typeNotSupported(type)
         }
@@ -79,9 +83,9 @@ public class Postgres: Dialect {
     public func buildDropCommand(type: RecordType) -> String? {
         switch type {
         case .table(let table):
-            return "DROP TABLE IF EXISTS \(table)"
+            return "DROP TABLE IF EXISTS \(table) CASCADE"
         case .view(let name, _):
-            return "DROP VIEW IF EXISTS \(name)"
+            return "DROP VIEW IF EXISTS \(name) CASCADE"
         case .query(_):
             return nil
         }
@@ -99,6 +103,8 @@ public class Postgres: Dialect {
                 postgresTraits.append("GENERATED ALWAYS AS IDENTITY")
             case .foreignKey(let t, let f):
                 postgresTraits.append("REFERENCES \(t) (\(f))")
+            case .unique:
+                postgresTraits.append("UNIQUE")
             case .defaultValue(let v):
                 postgresTraits.append("DEFAULT \(v)")
             default:
@@ -113,19 +119,22 @@ public class Postgres: Dialect {
             var expression = "\($0.fieldLocation ?? location).\($0.fieldName)"
             if let _expression = $0.fieldExpression {
                 expression = self
-                    .interpolate(components: _expression)
+                    .interpolate(components: _expression, fullyQualify: true)
                     .joined(separator: "")
             }
             return "\(expression) AS \($0.displayName)"
         }.joined(separator: ", ")
     }
-    public func interpolate(components: [QueryInterpolation]) -> [String] {
+    public func interpolate(components: [QueryInterpolation], fullyQualify: Bool) -> [String] {
         return components.map {
             switch $0 {
             case .argument(let value):
                 return "$\(value + 1)"
             case .field(let principal, let name):
-                return "\(principal).\(name)"
+                if fullyQualify {
+                    return "\(principal).\(name)"
+                }
+                return name
             case .literal(let string):
                 return "'\(string)'"
             case .raw(let string):
@@ -136,11 +145,13 @@ public class Postgres: Dialect {
     public func buildSelect(request: SelectRequest) -> String {
         let stringParams = [
             request.params.wh.map({ comps in
-                let componentString = self.interpolate(components: comps).joined()
+                let componentString = self.interpolate(components: comps, fullyQualify: true).joined()
                 return "WHERE \(componentString)"
             }),
             request.params.group.map({ "GROUP BY \($0)" }),
-            request.params.sort.map({ "ORDER BY \($0.0) \($0.1)" }),
+            request.params.sort.map({ sorts in
+                "ORDER BY \(sorts.map{ sort in "\(sort.0) \(sort.1)" }.joined(separator: ", "))"
+            }),
             request.params.limit.map({ "LIMIT \($0)" }),
         ]
         .compactMap { $0 }
@@ -165,22 +176,32 @@ public class Postgres: Dialect {
     public func buildUpdate(update: UpdateQueryParameters, tableName: String) -> String {
         var components = ["UPDATE \(tableName)"]
         if let set = update.set {
-            components.append("SET \(interpolate(components: set).joined(separator: ""))")
+            components
+                .append(
+                    "SET \(interpolate(components: set, fullyQualify: false).joined(separator: ""))"
+                )
         }
         if let wh = update.wh {
-            components.append("WHERE \(interpolate(components: wh).joined(separator: ""))")
+            components
+                .append(
+                    "WHERE \(interpolate(components: wh, fullyQualify: false).joined(separator: ""))"
+                )
         }
+        components.append("RETURNING *")
         return components.joined(separator: " ")
     }
     public func buildDelete(delete: DeleteQueryParameters, tableName: String) -> String {
         var components = ["DELETE FROM \(tableName)"]
         if let wh = delete.wh {
-            components.append("WHERE \(interpolate(components: wh).joined(separator: ""))")
+            components
+                .append(
+                    "WHERE \(interpolate(components: wh, fullyQualify: false).joined(separator: ""))"
+                )
         }
         components.append("RETURNING *")
         return components.joined(separator: " ")
     }
-    public func buildJoin(join: AnyJoin) -> String {
+    public func buildJoin(join: JoinRequest) -> String {
         var joinOperator: String!
         switch join.joinType {
         case .inner:

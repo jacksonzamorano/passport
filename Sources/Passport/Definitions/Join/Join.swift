@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 public enum JoinType: Sendable {
     case inner
@@ -10,13 +11,14 @@ public struct Join<T: Record>: Sendable {
     public var joinName: String
     public var location: String
     public var joinType: JoinType
-    public var condition: @Sendable () -> String
+    public var condition: @Sendable (String) -> String
     
     public init<
         BaseFields: Record,
         LocalFields: Record,
         ForeignFields: Record
     >(
+        _ explicitAlias: String? = nil,
         _ baseName: String,
         _ baseFields: BaseFields.Type,
         _ localName: String,
@@ -26,13 +28,20 @@ public struct Join<T: Record>: Sendable {
         joinType: JoinType,
         condition: @escaping JoinConditionFn<BaseFields, LocalFields, ForeignFields>
     ) {
-        let uuidTrim = UUID().uuidString.split(separator: "-")[1]
-        let jn = "\(foreignName)_\(uuidTrim)"
-        self.joinName = jn
+        let alias: String!
+        if let explicitAlias {
+            alias = "\(baseName)_\(explicitAlias)"
+        } else {
+            let hashInput = "\(baseName)-\(localName)-\(foreignName)-\(String(describing: condition))"
+            let digest = SHA256.hash(data: Data(hashInput.utf8))
+            let hex = digest.map { String(format: "%02x", $0) }.joined()
+            alias = "\(foreignName)_\(hex.prefix(6))"
+        }
+        self.joinName = alias
         self.location = foreignName
         self.joinType = joinType
-        self.condition = {
-            return condition(JoinAlias(alias: baseName), JoinAlias(alias: localName), JoinAlias(alias: jn)).value
+        self.condition = { base in
+            return condition(JoinAlias(alias: base), JoinAlias(alias: localName), JoinAlias(alias: alias)).value
         }
     }
 }
@@ -41,12 +50,12 @@ public struct AnyJoin: Sendable {
     public var joinName: String
     public var joinType: JoinType
     public var location: String
-    public var condition: String
+    public var condition: @Sendable (String) -> String
     
     public init<T: Record>(_ join: Join<T>) {
         self.joinName = join.joinName
         self.joinType = join.joinType
         self.location = join.location
-        self.condition = join.condition()
+        self.condition = join.condition
     }
 }

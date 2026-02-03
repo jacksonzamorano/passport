@@ -147,8 +147,8 @@ func buildModel(syntax: StructDeclSyntax, attribute: AttributeSyntax, context: M
                 public static func fromJoin<T: Record>(_ localJoin: KeyPath<Self.Type, Join<T>>, _ path: KeyPath<T, Field>) -> Field {
                     return Field(withJoin: Self.self[keyPath: localJoin], field: path)
                 }
-                public static func join<T: Record>(_ foreign: T.Type, type: JoinType, _ condition: @escaping JoinConditionFn<BaseValue, Self, T>) -> Join<T> {
-                    return Join(BaseValue.recordType.name, BaseValue.self, Self.recordType.name, Self.self, foreign.recordType.name, T.self, joinType: type, condition: condition)
+                public static func join<T: Record>(alias: String? = nil, _ foreign: T.Type, type: JoinType, _ condition: @escaping JoinConditionFn<BaseValue, Self, T>) -> Join<T> {
+                    return Join(alias, BaseValue.recordType.name, BaseValue.self, Self.recordType.name, Self.self, foreign.recordType.name, T.self, joinType: type, condition: condition)
                 } 
                 public static func insert(_ args: KeyPath<BaseValue, Field>...) -> Query {
                     return Query.insert(BaseValue.self, args)

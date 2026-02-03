@@ -35,6 +35,11 @@ public func packageRoot(_ url: String) -> URL {
     return url
 }
 
+struct SQLScriptBuilder {
+    var builder: SQLBuilder
+    var rootDirectory: URL
+}
+
 /// A schema groups models, records, enums, and routes for code generation.
 ///
 /// `Schema` is the central organizing construct in Passport. It collects all your
@@ -91,6 +96,9 @@ public class Schema {
 
     /// Code builders for each target language
     var builders: [CodeBuilder] = []
+    
+    /// SQL configurations registered
+    var dialects: [SQLScriptBuilder] = []
 
     /// Creates a new schema with models, records, enums, and routes.
     ///
@@ -157,6 +165,14 @@ public class Schema {
         self.builders.append(.init(schemaName: self.name, language: language, configuration: config))
         return self
     }
+    
+    public func sql(_ sql: SQLBuilder, rootDirectory: URL) -> Self {
+        self.dialects
+            .append(
+                SQLScriptBuilder(builder: sql, rootDirectory: rootDirectory)
+            )
+        return self
+    }
 
     /// Builds the schema and generates all code and SQL.
     ///
@@ -176,6 +192,15 @@ public class Schema {
     /// }
     /// ```
     public func build() throws {
+        for dialect in dialects {
+            let script = try dialect.builder.createScript(schema: self)
+            try script
+                .write(
+                    to: dialect.rootDirectory.appending(path: "init.sql"),
+                    atomically: true,
+                    encoding: .utf8
+                )
+        }
         for builder in builders {
             try builder
                 .build(

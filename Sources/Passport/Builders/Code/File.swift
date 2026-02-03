@@ -35,6 +35,10 @@ public class File {
     public func depend(_ val: String) {
         self.imports.insert(val)
     }
+    
+    public func prepend(_ val: String) {
+        self.contents.insert(contentsOf: val, at: self.contents.startIndex)
+    }
 
     /// Appends content to the file.
     ///

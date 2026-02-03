@@ -20,6 +20,9 @@
 public protocol Dialect {
     /// The SQL statement terminator (usually ";")
     var terminator: String { get }
+    
+    var startTransactionMarker: String { get }
+    var endTransactionMarker: String { get }
 
     /// Converts a Passport DataType to a database-specific SQL type.
     ///
@@ -38,7 +41,7 @@ public protocol Dialect {
     ///
     /// - Parameter components: Array of interpolation components (arguments, fields, literals, raw SQL)
     /// - Returns: Array of SQL string fragments
-    func interpolate(components: [QueryInterpolation]) -> [String]
+    func interpolate(components: [QueryInterpolation], fullyQualify: Bool) -> [String]
 
     /// Builds a CREATE TYPE statement for an enum.
     ///
@@ -119,5 +122,5 @@ public protocol Dialect {
     ///
     /// - Parameter join: The join definition
     /// - Returns: The JOIN SQL (e.g., "INNER JOIN users u ON u.id = posts.user_id")
-    func buildJoin(join: AnyJoin) -> String
+    func buildJoin(join: JoinRequest) -> String
 }

@@ -1,3 +1,6 @@
+import Foundation
+
+
 /// Temporary table name used for INSERT query results in CTE-based queries.
 let INSERT_TEMP_TABLE_NAME: String = "insert_result"
 
@@ -34,6 +37,20 @@ public struct SelectRequest {
     public var joins: [String] = []
 }
 
+public struct JoinRequest {
+    public var joinName: String
+    public var joinType: JoinType
+    public var location: String
+    public var condition: String
+    
+    public init(join: AnyJoin, baseName: String) {
+        self.joinName = join.joinName
+        self.joinType = join.joinType
+        self.location = join.location
+        self.condition = join.condition(baseName)
+    }
+}
+
 /// Builds SQL statements and schema scripts for database operations.
 ///
 /// `SQLBuilder` is the core SQL generation engine that works with a specific SQL dialect
@@ -52,6 +69,8 @@ public class SQLBuilder {
 
     /// The SQL dialect used for generating database-specific SQL
     var dialect: any Dialect
+    
+    var scriptsDirectory: URL? = nil
 
     /// Creates a new SQL builder with the specified dialect.
     ///
@@ -73,9 +92,9 @@ public class SQLBuilder {
     /// - Returns: A complete SQL script ready to execute
     /// - Throws: SQLError if any type cannot be converted
     public func createScript(schema: Schema) throws -> String {
-        var output = String()
+        var output = dialect.startTransactionMarker + "\n\n"
         for record in schema.records {
-            if let drop = drop(record: record.recordType) {
+            if let drop = drop(record: record) {
                 output += drop
                 output += dialect.terminator
                 output += "\n"
@@ -103,6 +122,7 @@ public class SQLBuilder {
                 output += "\n"
             }
         }
+        output += "\n\n\(dialect.endTransactionMarker)"
         return output
     }
 
@@ -126,8 +146,12 @@ public class SQLBuilder {
     ///
     /// - Parameter record: The record type to drop
     /// - Returns: A DROP TABLE statement, or nil if not supported by the dialect
-    public func drop(record: RecordType) -> String? {
-        return dialect.buildDropCommand(type: record)
+    public func drop(record: any Record.Type) -> String? {
+        return dialect.buildDropCommand(type: record.recordType)
+    }
+    
+    public func drop(enm: any Enum.Type) -> String? {
+        return dialect.buildEnumDropCommand(enm: enm)
     }
 
     /// Generates a CREATE TABLE statement for a record.
@@ -148,7 +172,10 @@ public class SQLBuilder {
                                                   traits: desc.tags)
             }
         return dialect.buildCreateCommand(type: record.recordType, fields: fields)
-
+    }
+    
+    public func create(enm: any Enum.Type) throws -> String? {
+        return dialect.buildEnumCreateCommand(enm: enm)
     }
 
     /// Builds a SQL query for a given Query and Record type.
@@ -171,13 +198,19 @@ public class SQLBuilder {
                 columns: selectColumns,
                 location: record.recordType.name,
                 params: parameters(),
-                joins: record.joins.map { dialect.buildJoin(join: $0) }
+                joins: record.joins.map({
+                    let val = JoinRequest(
+                        join: $0,
+                        baseName: record.recordType.name
+                    )
+                    return dialect.buildJoin(join: val)
+                })
             )
             sql = dialect.buildSelect(request: selectRequest)
         case .insert(let fields):
             let insertVariableNames = dialect.interpolate(components: fields.enumerated().map { idx, _ in
                 return QueryInterpolation.argument(idx)
-            })
+            }, fullyQualify: false)
             
             let insertColumns = Column.create(fromFields: fields)
             let insert = dialect.buildInsert(columnNames: insertColumns.map{ $0.fieldName }.joined(separator: ", "), columnValues: insertVariableNames.joined(separator: ", "), tableName:  record.recordType.name)
@@ -189,7 +222,13 @@ public class SQLBuilder {
                 location: INSERT_TEMP_TABLE_NAME,
                 params: SelectQueryParameters(),
                 ctes: [INSERT_TEMP_TABLE_NAME: insert],
-                joins: record.joins.map({ dialect.buildJoin(join: $0) })
+                joins: record.joins.map({
+                    let val = JoinRequest(
+                        join: $0,
+                        baseName: INSERT_TEMP_TABLE_NAME
+                    )
+                    return dialect.buildJoin(join: val)
+                })
             )
             sql = dialect.buildSelect(request: selectRequest)
         case .update(let parameters):
@@ -208,7 +247,13 @@ public class SQLBuilder {
                 location: UPDATE_TEMP_TABLE_NAME,
                 params: SelectQueryParameters(),
                 ctes: [UPDATE_TEMP_TABLE_NAME: update],
-                joins: record.joins.map({ dialect.buildJoin(join: $0) })
+                joins: record.joins.map({
+                    let val = JoinRequest(
+                        join: $0,
+                        baseName: UPDATE_TEMP_TABLE_NAME
+                    )
+                    return dialect.buildJoin(join: val)
+                })
             )
             sql = dialect.buildSelect(request: selectRequest)
         case .delete(let parameters):
@@ -219,14 +264,20 @@ public class SQLBuilder {
             
             let selectColumns = dialect.buildColumns(
                 columns: Column.create(fromFields: record.fields),
-                location: UPDATE_TEMP_TABLE_NAME
+                location: DELETE_TEMP_TABLE_NAME
             )
             let selectRequest = SelectRequest(
                 columns: selectColumns,
-                location: UPDATE_TEMP_TABLE_NAME,
+                location: DELETE_TEMP_TABLE_NAME,
                 params: SelectQueryParameters(),
                 ctes: [DELETE_TEMP_TABLE_NAME: delete],
-                joins: record.joins.map({ dialect.buildJoin(join: $0) })
+                joins: record.joins.map({
+                    let val = JoinRequest(
+                        join: $0,
+                        baseName: DELETE_TEMP_TABLE_NAME
+                    )
+                    return dialect.buildJoin(join: val)
+                })
             )
             sql = dialect.buildSelect(request: selectRequest)
         default:

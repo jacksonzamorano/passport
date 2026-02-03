@@ -6,8 +6,13 @@ public struct JoinAlias<T: Record> {
     }
     
     public func use(_ kp: KeyPath<T, Field>) -> JoinFragment<T> {
-        let name = T.field(forKeyPath: kp)!.name
-        return JoinFragment(alias: alias, name: name)
+        let field = T.field(forKeyPath: kp)!
+        switch field.field.descriptionLocation {
+        case .stored(_):
+            return JoinFragment(alias: alias, name: field.name)
+        case .remote(let r):
+            return JoinFragment(alias: r().base ?? alias, name: field.name)
+        }
     }
 }
 public struct JoinFragment<T: Record> {

@@ -5,6 +5,12 @@ fileprivate extension NamedQuery {
     }
 }
 
+fileprivate let goPrefil = """
+        type queryable interface {
+            Query(query string, args ...interface{}) (*sql.Rows, error)
+        }
+        
+        """
 
 
 public final class GoConfiguration {
@@ -91,7 +97,11 @@ public class Go: Language {
             """)
     }
     public func build(model: any Model.Type, session: CodeBuildSession) throws {
-        let file = session.file(named: model.name, withExtension: "go")
+        let file = session.file(
+            named: model.name,
+            withExtension: "go",
+            prefill: goPrefil
+        )
         let fields = try model.fields.map {
             let extraJsonTags = $0.field.tagged(with: Self.omitEmpty) ? ",omitempty" : ""
             let type = try convert(
@@ -109,7 +119,11 @@ public class Go: Language {
         
     }
     public func build(record: any Record.Type, session: CodeBuildSession) throws {
-        let file = session.file(named: record.name, withExtension: "go")
+        let file = session.file(
+            named: record.name,
+            withExtension: "go",
+            prefill: goPrefil
+        )
         try build(model: record, session: session)
         
         file.append("""
@@ -129,6 +143,7 @@ public class Go: Language {
                     if err != nil {
                         return nil, err
                     }
+                    defer rows.Close()
                     if rows.Next() {
                         var record \(recordNameCased)
                         err := Scan\(recordNameCased)(rows, &record)
@@ -145,6 +160,7 @@ public class Go: Language {
                     if err != nil {
                         return nil, err
                     }
+                    defer rows.Close()
                     records := make([]\(recordNameCased), 0)
                     for rows.Next() {
                         var record \(recordNameCased)
@@ -161,7 +177,7 @@ public class Go: Language {
             }
             
             file.depend("database/sql")
-            var args: [String] = ["db *sql.DB"]
+            var args: [String] = ["db queryable"]
             args.append(contentsOf: try query.query.arguments.map {
                 "\($0.name) \(try convert(type: $0.dataType, inFile: file))"
             })
@@ -176,15 +192,14 @@ public class Go: Language {
             file.append("""
                 func \(query.goName())(\(args.joined(separator: ", "))) \(returnValue!) {
                     rows, err := db.Query(\(queryArgs.joined(separator: ", ")))
-                    defer rows.Close()
-                    \(parseValue!)
+                \(parseValue!)
                 }\n\n
                 """)
         }
     }
     public func build(routes: [ResolvedRoute], session: CodeBuildSession) throws {
-        let file = session.file(named: "\(session.schemaName)API", withExtension: "go")
-        
+        let file = session.file(named: "\(session.schemaName)API", withExtension: "go", prefill: goPrefil)
+
         let variants = routes.map {
             """
             var \(session.schemaName)Route\($0.route.name.snakeToPascalCase()) = \(session.schemaName)Route{

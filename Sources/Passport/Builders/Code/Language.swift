@@ -30,15 +30,6 @@ public protocol Language {
     /// - Returns: The formatted comment in the target language's syntax
     func comment(for comment: String) -> String
 
-    /// Converts a Passport DataType to a language-specific type string.
-    ///
-    /// - Parameters:
-    ///   - type: The Passport data type to convert
-    ///   - file: The file context where this type will be used (for tracking imports)
-    /// - Returns: The type representation in the target language
-    /// - Throws: `LanguageError` if the type cannot be converted
-    func convert(type: DataType, inFile file: File) throws -> String
-
     /// Generates the import/include statements for the target language.
     ///
     /// - Parameter imports: Array of import identifiers needed by the generated code
