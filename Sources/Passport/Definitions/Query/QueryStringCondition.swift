@@ -1,7 +1,7 @@
 import Foundation
 
 public indirect enum QueryInterpolation: Sendable {
-    case field(String, String), literal(String), raw(String), argument(Int)
+    case field(String, String), qualifiedField(String, String), literal(String), raw(String), argument(Int)
 }
 
 public struct QueryStringCondition<Principal: Record, Arguments: QueryArguments>: ExpressibleByStringInterpolation, CustomStringConvertible {
@@ -41,6 +41,12 @@ public struct QueryStringCondition<Principal: Record, Arguments: QueryArguments>
         mutating public func appendInterpolation(_ value: KeyPath<Arguments, DataType>) {
             let index = Arguments._index(forKeyPath: value)!
             output.append(.argument(index))
+        }
+        mutating public func appendInterpolation<T: Record>(_ value: CTEAlias<T>) {
+            output.append(.raw(value.name))
+        }
+        mutating public func appendInterpolation<T: Record>(_ value: CTEField<T>) {
+            output.append(.qualifiedField(value.alias, value.fieldName))
         }
         mutating public func appendInterpolation(_ value: any RawRepresentable<String>) {
             output.append(.literal(value.rawValue))

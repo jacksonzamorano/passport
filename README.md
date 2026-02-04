@@ -64,6 +64,7 @@ struct User {
     static let updateName = update(with: UpdateNameArgs.self) { query in
         query.set("\(\User.name) = \(\UpdateNameArgs.name)")
         query.filter("\(\User.id) = \(\.userId)")
+        query.one()
     }
 
     @Argument
@@ -295,6 +296,7 @@ static let insertUser = insert(\.email, \.name, \.role)
 static let updateName = update(with: UpdateNameArgs.self) { query in
     query.set("\(\User.name) = \(\UpdateNameArgs.name)")
     query.filter("\(\User.id) = \(\.userId)")
+    query.one()
 }
 
 // DELETE query

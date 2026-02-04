@@ -22,6 +22,19 @@ struct TestUser {
         query.filter("\(\TestUser.id) = \(\UpdateArgs.id)")
     }
 
+    static let updateNameOne = update(with: UpdateArgs.self) { query in
+        query.set("\(\TestUser.name) = \(\UpdateArgs.newName)")
+        query.filter("\(\TestUser.id) = \(\UpdateArgs.id)")
+        query.one()
+    }
+
+    static let deleteByNameWithCte = delete(with: DeleteByNameArgs.self) { query in
+        let matched = query.cte("matched_users", TestUser.self) { cte in
+            cte.filter("\(\TestUser.name) = \(\DeleteByNameArgs.name)")
+        }
+        query.filter("\(\TestUser.id) IN (SELECT \(matched.id) FROM \(matched))")
+    }
+
     @Argument
     struct ByIdArgs {
         var userId: DataType = .int64
@@ -31,6 +44,11 @@ struct TestUser {
     struct UpdateArgs {
         var id: DataType = .int64
         var newName: DataType = .string
+    }
+
+    @Argument
+    struct DeleteByNameArgs {
+        var name: DataType = .string
     }
 }
 
@@ -78,9 +96,26 @@ struct PetProfile {
     #expect(sql.contains("update_result.name AS name"))
 }
 
+@Test func updateQuerySupportsOneReturnCount() {
+    let sql = SQLBuilder(Postgres()).build(query: TestUser.updateNameOne, forRecord: TestUser.self)
+
+    #expect(TestUser.updateNameOne.returnCount == .one)
+    #expect(sql.contains("WITH update_result AS (UPDATE users SET users.name = $2 WHERE users.id = $1)"))
+    #expect(sql.contains("LIMIT 1"))
+}
+
+@Test func deleteQuerySupportsTypedCteFilters() {
+    let sql = SQLBuilder(Postgres()).build(query: TestUser.deleteByNameWithCte, forRecord: TestUser.self)
+
+    #expect(sql.contains("WITH matched_users AS (SELECT users.id AS id"))
+    #expect(sql.contains("WHERE users.name = $1"))
+    #expect(sql.contains("DELETE FROM users WHERE id IN (SELECT matched_users.id FROM matched_users)"))
+    #expect(sql.contains("SELECT delete_result.id AS id"))
+}
+
 @Test func swiftGeneratorStandardizesPropertyNames() throws {
     let lang = Swift(standardizePropertyNames: true)
-    let session = CodeBuildSession()
+    let session = CodeBuildSession(schemaName: "TestSchema")
 
     try lang.build(model: PetProfile.self, session: session)
 

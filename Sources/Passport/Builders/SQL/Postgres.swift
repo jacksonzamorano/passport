@@ -135,6 +135,8 @@ public class Postgres: Dialect {
                     return "\(principal).\(name)"
                 }
                 return name
+            case .qualifiedField(let principal, let name):
+                return "\(principal).\(name)"
             case .literal(let string):
                 return "'\(string)'"
             case .raw(let string):
@@ -153,16 +155,17 @@ public class Postgres: Dialect {
                 "ORDER BY \(sorts.map{ sort in "\(sort.0) \(sort.1)" }.joined(separator: ", "))"
             }),
             request.params.limit.map({ "LIMIT \($0)" }),
+            request.params.skip.map({ "OFFSET \($0)" }),
         ]
         .compactMap { $0 }
         .joined(separator: " ")
         
         var statements: [String] = []
         if !request.ctes.isEmpty {
-            statements.append("WITH")
-        }
-        for cte in request.ctes {
-            statements.append("\(cte.key) AS (\(cte.value))")
+            let cteStatements = request.ctes
+                .map { "\($0.0) AS (\($0.1))" }
+                .joined(separator: ", ")
+            statements.append("WITH \(cteStatements)")
         }
         statements.append("SELECT \(request.columns) FROM \(request.location)")
         statements.append(contentsOf: request.joins)

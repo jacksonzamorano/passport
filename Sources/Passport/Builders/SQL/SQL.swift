@@ -30,8 +30,8 @@ public struct SelectRequest {
     /// Query parameters like WHERE conditions, ORDER BY, LIMIT, etc.
     public var params: SelectQueryParameters
 
-    /// Common Table Expressions (WITH clauses) mapping CTE name to SQL definition
-    public var ctes: [String: String] = [:]
+    /// Common Table Expressions (WITH clauses) in order
+    public var ctes: [(String, String)] = []
 
     /// Array of JOIN clauses to include in the query
     public var joins: [String] = []
@@ -192,12 +192,15 @@ public class SQLBuilder {
         var sql: String = ""
         switch query.type {
         case .select(let parameters):
+            let selectParams = parameters()
+            let ctes = buildCTEs(from: selectParams.ctes)
             let columns = Column.create(fromFields: record.fields)
             let selectColumns = dialect.buildColumns(columns: columns, location: record.recordType.name)
             let selectRequest = SelectRequest(
                 columns: selectColumns,
                 location: record.recordType.name,
-                params: parameters(),
+                params: selectParams,
+                ctes: ctes,
                 joins: record.joins.map({
                     let val = JoinRequest(
                         join: $0,
@@ -221,7 +224,7 @@ public class SQLBuilder {
                 columns: selectColumnNames,
                 location: INSERT_TEMP_TABLE_NAME,
                 params: SelectQueryParameters(),
-                ctes: [INSERT_TEMP_TABLE_NAME: insert],
+                ctes: [(INSERT_TEMP_TABLE_NAME, insert)],
                 joins: record.joins.map({
                     let val = JoinRequest(
                         join: $0,
@@ -232,21 +235,33 @@ public class SQLBuilder {
             )
             sql = dialect.buildSelect(request: selectRequest)
         case .update(let parameters):
+            let updateParams = parameters()
             let update = dialect.buildUpdate(
-                update: parameters(),
+                update: updateParams,
                 tableName: record.recordType.name
             )
+            var ctes = buildCTEs(from: updateParams.ctes)
+            ctes.append((UPDATE_TEMP_TABLE_NAME, update))
             
             let selectColumns = dialect.buildColumns(
                 columns: Column.create(fromFields: record.fields),
                 location: UPDATE_TEMP_TABLE_NAME
             )
             
+            var selectParams = SelectQueryParameters()
+            selectParams.returnCount = updateParams.returnCount
+            switch updateParams.returnCount {
+            case .one, .none:
+                selectParams.limit = 1
+            case .many:
+                break
+            }
+
             let selectRequest = SelectRequest(
                 columns: selectColumns,
                 location: UPDATE_TEMP_TABLE_NAME,
-                params: SelectQueryParameters(),
-                ctes: [UPDATE_TEMP_TABLE_NAME: update],
+                params: selectParams,
+                ctes: ctes,
                 joins: record.joins.map({
                     let val = JoinRequest(
                         join: $0,
@@ -257,10 +272,13 @@ public class SQLBuilder {
             )
             sql = dialect.buildSelect(request: selectRequest)
         case .delete(let parameters):
+            let deleteParams = parameters()
             let delete = dialect.buildDelete(
-                delete: parameters(),
+                delete: deleteParams,
                 tableName: record.recordType.name
             )
+            var ctes = buildCTEs(from: deleteParams.ctes)
+            ctes.append((DELETE_TEMP_TABLE_NAME, delete))
             
             let selectColumns = dialect.buildColumns(
                 columns: Column.create(fromFields: record.fields),
@@ -270,7 +288,7 @@ public class SQLBuilder {
                 columns: selectColumns,
                 location: DELETE_TEMP_TABLE_NAME,
                 params: SelectQueryParameters(),
-                ctes: [DELETE_TEMP_TABLE_NAME: delete],
+                ctes: ctes,
                 joins: record.joins.map({
                     let val = JoinRequest(
                         join: $0,
@@ -284,5 +302,11 @@ public class SQLBuilder {
             break
         }
         return sql
+    }
+
+    private func buildCTEs(from ctes: [QueryCTE]) -> [(String, String)] {
+        return ctes.map { cte in
+            return (cte.name, build(query: cte.query, forRecord: cte.record))
+        }
     }
 }

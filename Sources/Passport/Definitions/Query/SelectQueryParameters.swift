@@ -6,7 +6,7 @@ public struct SelectQueryParameters: Sendable {
     var sort: [(String, SortDirection)]? = nil
     var limit: Int? = nil
     var group: String? = nil
-    var cte: [String: Query] = [:]
+    var ctes: [QueryCTE] = []
     var returnCount: ReturnCount = .many
     
     public init() { }
