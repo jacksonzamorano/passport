@@ -1,5 +1,18 @@
 import Foundation
-import CryptoKit
+
+public func fnv1a64(_ string: String) -> String {
+    let bytes = Array(string.utf8)
+    
+    var hash: UInt64 = 0xcbf29ce484222325  // FNV offset basis
+    let prime: UInt64 = 0x100000001b3       // FNV prime
+    
+    for byte in bytes {
+        hash ^= UInt64(byte)
+        hash &*= prime
+    }
+    
+    return String(format: "%016llx", hash)
+}
 
 public enum JoinType: Sendable {
     case inner, cross, left, right
@@ -33,9 +46,8 @@ public struct Join<T: Record>: Sendable {
             alias = "\(baseName)_\(explicitAlias)"
         } else {
             let hashInput = "\(baseName)-\(localName)-\(foreignName)-\(String(describing: condition))"
-            let digest = SHA256.hash(data: Data(hashInput.utf8))
-            let hex = digest.map { String(format: "%02x", $0) }.joined()
-            alias = "\(foreignName)_\(hex.prefix(6))"
+            let digest = fnv1a64(hashInput)
+            alias = "\(foreignName)_\(digest.prefix(6))"
         }
         self.joinName = alias
         self.location = foreignName

@@ -148,7 +148,10 @@ public class Postgres: Dialect {
                 "ORDER BY \(sorts.map{ sort in "\(sort.0) \(sort.1)" }.joined(separator: ", "))"
             }),
             request.params.limit.map({ "LIMIT \($0)" }),
-            request.params.skip.map({ "OFFSET \($0)" }),
+            request.params.skip.map({ comps in
+                let componentString = self.interpolate(components: comps, fullyQualify: true).joined()
+                return "OFFSET \(componentString)"
+            }),
         ]
             .compactMap { $0 }
             .joined(separator: " ")

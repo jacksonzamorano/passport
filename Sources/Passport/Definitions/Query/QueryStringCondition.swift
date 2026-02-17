@@ -4,6 +4,19 @@ public indirect enum QueryInterpolation: Sendable {
     case field(String, String), qualifiedField(String, String), literal(String), raw(String), argument(Int)
 }
 
+private func interpolationField<Principal: Record>(
+    for value: KeyPath<Principal, Field>
+) -> QueryInterpolation {
+    let namedField = Principal.field(forKeyPath: value)!
+    let fieldDescription = namedField.field.description
+    let name = fieldDescription.columnName ?? namedField.name
+
+    if let base = fieldDescription.base {
+        return .qualifiedField(base, name)
+    }
+    return .field("\(Principal.recordType.name)", name)
+}
+
 public struct QueryStringCondition<Principal: Record, Arguments: QueryArguments>: ExpressibleByStringInterpolation, CustomStringConvertible {
 
     public var description: String { components.description }
@@ -33,10 +46,7 @@ public struct QueryStringCondition<Principal: Record, Arguments: QueryArguments>
             output.append(.raw(literal))
         }
         mutating public func appendInterpolation(_ value: KeyPath<Principal, Field>) {
-            let name = Principal.field(forKeyPath: value)!.name
-            // Wrapping this in a string is required, as it makes a new string
-            // Referencing the existing string results in a bad access
-            output.append(.field("\(Principal.recordType.name)", name))
+            output.append(interpolationField(for: value))
         }
         mutating public func appendInterpolation(_ value: KeyPath<Arguments, DataType>) {
             let index = Arguments._index(forKeyPath: value)!
@@ -83,10 +93,7 @@ public struct QueryStringSingleLocationCondition<Principal: Record>: Expressible
             output.append(.raw(literal))
         }
         mutating public func appendInterpolation(_ value: KeyPath<Principal, Field>) {
-            let name = Principal.field(forKeyPath: value)!.name
-            // Wrapping this in a string is required, as it makes a new string
-            // Referencing the existing string results in a bad access
-            output.append(.field("\(Principal.recordType.name)", name))
+            output.append(interpolationField(for: value))
         }
     }
 }
