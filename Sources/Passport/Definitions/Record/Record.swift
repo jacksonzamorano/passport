@@ -51,8 +51,6 @@ public macro Record(type: RecordType) = #externalMacro(
 public enum RecordType: Sendable {
     /// A simple table, stored and persisted in a database. Joins are not allowed.
     case table(String)
-    /// A view, stored and persisted in a database. Joins are allowed.
-    case view(String, any Record.Type)
     /// A query, which is not stored or persisted. This defines a query whose base table is the provided ``Record``.
     case query(any Record.Type)
     
@@ -63,8 +61,6 @@ public enum RecordType: Sendable {
             return name
         case .query(let base):
             return base.recordType.name
-        case .view(let name, _):
-            return name
         }
     }
 }

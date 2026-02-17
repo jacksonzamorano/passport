@@ -12,11 +12,25 @@ fileprivate let goPrefil = """
         
         """
 
+public enum GoArrayTypeWrapper {
+    case none, pgArray
+    
+    func build(_ str: String, inFile file: File) -> String {
+        switch self {
+        case .none:
+            return str
+        case .pgArray:
+            file.depend("github.com/lib/pq")
+            return "pq.Array(\(str))"
+        }
+    }
+}
 
 public final class GoConfiguration {
     public var packageName: String = "main"
     public var uuidProvider: String = "github.com/google/uuid"
     public var uuidClass: String = "uuid.UUID"
+    public var arrayTypeWrapper: GoArrayTypeWrapper = .none
     
     public init() {}
     public init(config: (GoConfiguration) -> Void) {
@@ -80,9 +94,9 @@ public class Go: Language {
             return model.name
         }
     }
-    
+
     public func build(enm: any Enum.Type, session: CodeBuildSession) throws {
-        let file = session.file(named: enm.name, withExtension: "go")
+        let file = session.file(named: enm.name, withExtension: "go", prefill: goPrefil)
         
         let variants = enm.variants.map {
             "\(enm.name)\($0.key.snakeToPascalCase()) \(enm.name) = \"\($0.value)\""
@@ -187,7 +201,14 @@ public class Go: Language {
                 with: "\\\""
             )
             var queryArgs: [String] = ["\"\(sql)\""]
-            queryArgs.append(contentsOf: query.query.arguments.map { $0.name })
+            queryArgs.append(contentsOf: query.query.arguments.map { arg in
+                switch arg.dataType {
+                case .array(_):
+                    return self.config.arrayTypeWrapper.build(arg.name, inFile: file)
+                default:
+                    return arg.name
+                }
+            })
             
             file.append("""
                 func \(query.goName())(\(args.joined(separator: ", "))) \(returnValue!) {

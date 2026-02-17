@@ -14,6 +14,7 @@ struct CrossKitDemo {
 
         let go = GoConfiguration { cfg in
             cfg.packageName = "demo"
+            cfg.arrayTypeWrapper = .pgArray
         }
         
         let root = packageRoot(#filePath)
@@ -23,6 +24,7 @@ struct CrossKitDemo {
             User.self
             UserStatus.self
             UserCreateDto.self
+            UserInfo.self
             
             Note.self
             NoteCountQuery.self
@@ -55,6 +57,7 @@ struct CrossKitDemo {
                 generateRoutes: true
             )
         }
+        .sql(postgres, rootDirectory: root.appending(path: "demo"))
         
         
         try! schema.build()

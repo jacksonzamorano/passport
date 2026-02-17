@@ -1,68 +1,43 @@
-/// PostgreSQL dialect implementation for SQL generation.
-///
-/// `Postgres` implements the `Dialect` protocol to generate PostgreSQL-specific SQL
-/// statements, including proper type conversions, parameter placeholders, and PostgreSQL features
-/// like RETURNING clauses and array types.
-///
-/// ## Features
-/// - PostgreSQL data types (INT4, INT8, TEXT, BOOL, etc.)
-/// - Array type support (e.g., TEXT[])
-/// - Numbered parameter placeholders ($1, $2, etc.)
-/// - CREATE TYPE for enums
-/// - RETURNING clauses for INSERT, UPDATE, DELETE
-/// - CTEs (Common Table Expressions) support
-///
-/// ## Example
-/// ```swift
-/// let postgres = SQLBuilder(Postgres())
-/// let sql = try postgres.createScript(schema: mySchema)
-/// ```
-public class Postgres: Dialect {
+public class SQLite: Dialect {
     /// Creates a new PostgreSQL dialect instance.
     public init() {}
     
     /// The SQL statement terminator for PostgreSQL
     public var terminator: String = ";"
-    public var startTransactionMarker: String = "BEGIN TRANSACTION;"
+    public var startTransactionMarker: String = "BEGIN;"
     public var endTransactionMarker: String = "COMMIT;"
     public func convertType(_ type: DataType) throws -> String {
         switch type {
+        case .value:
+            return "TEXT"
         case .optional(let o):
             return try self.convertType(o)
-        case .array(let t):
-            let inner = try self.convertType(t)
-            return inner + "[]"
-        case .value(let e):
-            return e.name
         case .bool:
-            return "BOOL"
+            return "BOOLEAN"
         case .double:
             return "DOUBLE"
         case .bytes:
-            return "BINARY"
+            return "BLOB"
         case .datetime:
-            return "TIMESTAMPTZ"
+            return "DATETIME"
         case .int32:
-            return "INT4"
+            return "INTEGER"
         case .int64:
-            return "INT8"
+            return "INTEGER"
         case .string:
             return "TEXT"
-        case .uuid:
-            return "UUID"
         default:
             throw SQLError.typeNotSupported(type)
         }
     }
     public func queryParameterToken(atIndex idx: Int) -> String {
-        return "$\(idx + 1)"
+        return "?"
     }
     public func buildEnumCreateCommand(enm: any Enum.Type) -> String? {
-        let casesString = enm.variants.values.map{"\"\($0)\""}.joined(separator: ", ")
-        return "CREATE TYPE \(enm.name) AS (\(casesString))"
+        return nil
     }
     public func buildEnumDropCommand(enm: any Enum.Type) -> String? {
-        return "DROP TYPE \(enm.name)"
+        return nil
     }
     public func buildCreateTableCommand(tableName: String, fields: [String]) -> String? {
         return """
@@ -71,13 +46,14 @@ public class Postgres: Dialect {
                 )
                 """
     }
+    
     public func buildCreateViewCommand(viewName: String, query: String) -> String? {
         return "CREATE VIEW \(viewName) AS \(query)"
     }
     public func buildDropCommand(type: RecordType) -> String? {
         switch type {
         case .table(let table):
-            return "DROP TABLE IF EXISTS \(table) CASCADE"
+            return "DROP TABLE IF EXISTS \(table)"
         case .query(_):
             return nil
         }
@@ -91,11 +67,9 @@ public class Postgres: Dialect {
             switch t {
             case .primaryKey:
                 postgresTraits.append("PRIMARY KEY")
-            case .generatedAlways:
-                postgresTraits.append("GENERATED ALWAYS AS IDENTITY")
             case .foreignKey(let ref):
-                let fk = ref()
-                postgresTraits.append("REFERENCES \(fk.entity) (\(fk.column))")
+                let data = ref()
+                postgresTraits.append("REFERENCES \(data.entity) (\(data.column))")
             case .unique:
                 postgresTraits.append("UNIQUE")
             case .defaultValue(let v):
@@ -121,8 +95,8 @@ public class Postgres: Dialect {
     public func interpolate(components: [QueryInterpolation], fullyQualify: Bool) -> [String] {
         return components.map {
             switch $0 {
-            case .argument(let value):
-                return "$\(value + 1)"
+            case .argument:
+                return "?"
             case .field(let principal, let name):
                 if fullyQualify {
                     return "\(principal).\(name)"
@@ -212,3 +186,4 @@ public class Postgres: Dialect {
         return "\(joinOperator!) \(join.location) \(join.joinName) ON \(join.condition)"
     }
 }
+

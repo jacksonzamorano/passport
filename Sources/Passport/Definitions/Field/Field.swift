@@ -173,14 +173,44 @@ final public class Field: Sendable {
             )
         })
     }
+    
+    
+    /// Creates a field from a joined table.
+    ///
+    /// This allows accessing fields from related records through JOIN operations.
+    ///
+    /// - Parameters:
+    ///   - withJoin: The join definition specifying the relationship
+    ///   - field: Key path to the field in the joined record
+    ///
+    /// ## Example
+    /// ```swift
+    /// var authorName = Field(withJoin: authorJoin, field: \.name)
+    /// ```
+    public init<T: Record>(withJoin: Join<T>, field: KeyPath<T, Field>, fromView: String) {
+        let index = T.index(forKeyPath: field)
+        self.descriptionLocation = .remote({
+            let referencingField = T.fields[index]
+            let referencingFieldData = referencingField.field.description
+            return .init(
+                columnName: referencingFieldData.columnName ?? referencingField.name,
+                base: fromView,
+                dataType: referencingFieldData.dataType,
+                tags: referencingFieldData.tags
+            )
+        })
+    }
 
     /// Checks if this field has a specific tag.
     ///
     /// - Parameter tag: The tag to check for
     /// - Returns: `true` if the field has the specified tag, `false` otherwise
     public func tagged(with tag: FieldTag) -> Bool {
+        guard case let .custom(id) = tag else {
+            return false
+        }
         for t in self.description.tags {
-            if t == tag {
+            if case let .custom(string) = t, id == string {
                 return true
             }
         }

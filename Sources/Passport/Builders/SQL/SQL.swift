@@ -163,15 +163,20 @@ public class SQLBuilder {
     /// - Returns: A CREATE TABLE statement, or nil if not supported by the dialect
     /// - Throws: SQLError if any field type cannot be converted
     public func create(record: any Record.Type) throws -> String? {
-        let fields = try record.fields
-            .filter { $0.field.description.definition == nil }
-            .map {
-                let desc = $0.field.description
-                return try dialect.buildColumnDefinition(name: $0.name,
-                                                  dataType: desc.dataType,
-                                                  traits: desc.tags)
-            }
-        return dialect.buildCreateCommand(type: record.recordType, fields: fields)
+        switch record.recordType {
+        case .table(let name):
+            let fields = try record.fields
+                .filter { $0.field.description.definition == nil }
+                .map {
+                    let desc = $0.field.description
+                    return try dialect.buildColumnDefinition(name: $0.name,
+                                                             dataType: desc.dataType,
+                                                             traits: desc.tags)
+                }
+            return dialect.buildCreateTableCommand(tableName: name, fields: fields)
+        default:
+            return nil
+        }
     }
     
     public func create(enm: any Enum.Type) throws -> String? {

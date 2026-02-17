@@ -2,10 +2,10 @@ import Foundation
 import CryptoKit
 
 public enum JoinType: Sendable {
-    case inner
+    case inner, cross, left, right
 }
 
-public typealias JoinConditionFn<BaseFields: Record, LocalFields: Record, ForeignFields: Record> = @Sendable (JoinAlias<BaseFields>, JoinAlias<LocalFields>, JoinAlias<ForeignFields>) -> JoinStringCondition<BaseFields, LocalFields, ForeignFields>
+public typealias JoinConditionFn<BaseFields: Record, LocalFields: Record, ForeignFields: Record> = @Sendable (JoinBase<BaseFields>, JoinThis<LocalFields>, JoinForeign<ForeignFields>) -> JoinStringCondition<BaseFields, LocalFields, ForeignFields>
 
 public struct Join<T: Record>: Sendable {
     public var joinName: String
@@ -41,7 +41,11 @@ public struct Join<T: Record>: Sendable {
         self.location = foreignName
         self.joinType = joinType
         self.condition = { base in
-            return condition(JoinAlias(alias: base), JoinAlias(alias: localName), JoinAlias(alias: alias)).value
+            return condition(
+                JoinBase(alias: base),
+                JoinThis(alias: localName),
+                JoinForeign(alias: alias)
+            ).value
         }
     }
 }

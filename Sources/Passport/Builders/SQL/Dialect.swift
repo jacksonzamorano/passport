@@ -61,7 +61,8 @@ public protocol Dialect {
     ///   - type: The record type (table or view)
     ///   - fields: Array of column definition strings
     /// - Returns: The CREATE statement, or nil if not supported
-    func buildCreateCommand(type: RecordType, fields: [String]) -> String?
+    func buildCreateTableCommand(tableName: String, fields: [String]) -> String?
+    func buildCreateViewCommand(viewName: String, query: String) -> String?
 
     /// Builds a DROP TABLE or VIEW statement.
     ///

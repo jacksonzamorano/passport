@@ -8,6 +8,7 @@ struct User {
     let name = Field(.string)
     let archived = Field(.bool)
     let status = Field(.value(UserStatus.self))
+    let parentId = Field(.int64, .foreignKey(\User.id))
 
     static let selectById = select(with: SelectByIdArgs.self) { query in
         query.filter("\(\User.id) = \(\.userId)")
@@ -27,6 +28,13 @@ struct User {
         let userId: DataType = .int64
     }
     
+    @Argument
+    struct IdList {
+        let ids: DataType = .array(.int64)
+    }
+    static let getInIdList = select(with: IdList.self) { q in
+        q.filter("\(\.id) IN (\(\.ids))")
+    }
     
     static let insertUser = insert(\.name, \.archived)
     
@@ -40,6 +48,25 @@ struct User {
     struct UpdateNameByIdArgs {
         let userId: DataType = .int64
         let name: DataType = .string
+    }
+}
+
+@Record(type: .query(User.self))
+struct UserInfo {
+    let id = fromBase(\.id)
+    
+    static let parent = join(User.self, type: .inner) { this, base, up in
+        "\(this.use(\.id)) = \(up.use(\.id))"
+    }
+    
+    let parentId = fromJoin(\.parent, \.id)
+    
+    @Argument
+    struct Id {
+        let _id: DataType = .int64
+    }
+    static let getUserInfoById = select(with: Id.self) { q in
+        q.filter("\(\.id) = \(\._id) OR \(\.parentId) = \(\._id)")
     }
 }
 

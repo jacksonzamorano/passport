@@ -12,7 +12,7 @@ import Foundation
 /// var createdAt = Field(.datetime, .defaultValue("NOW()"))
 /// var authorId = Field(.int64, .foreignKey(User.self, \.id))
 /// ```
-public enum FieldTag: Equatable, Sendable {
+public enum FieldTag: Sendable {
     /// Marks the field as a primary key column
     case primaryKey
 
@@ -24,12 +24,11 @@ public enum FieldTag: Equatable, Sendable {
     /// - Parameter String: The SQL expression for the default value (e.g., "NOW()", "'default'")
     case defaultValue(String)
 
-    /// Marks the field as a foreign key reference to another table
-    ///
-    /// - Parameters:
-    ///   - String: The referenced table name
-    ///   - String: The referenced column name
-    case foreignKey(String, String)
+    case foreignKey(ForeignKeyDefinitionFunction)
+    public struct ForeignKeyDefinition {
+        public let entity: String
+        public let column: String
+    }
     
     case unique
 
@@ -48,9 +47,14 @@ public enum FieldTag: Equatable, Sendable {
     /// var authorId = Field(.int64, .foreignKey(User.self, \.id))
     /// ```
     static public func foreignKey<T: Record>(_ keyPath: KeyPath<T, Field>) -> Self {
-        return .foreignKey(
-            T.recordType.name,
-            T.field(forKeyPath: keyPath)!.name
-        )
+        let idx = T.index(forKeyPath: keyPath)
+        return .foreignKey {
+            return ForeignKeyDefinition(
+                entity: T.recordType.name,
+                column: T.fields[idx].name
+            )
+        }
     }
 }
+
+public typealias ForeignKeyDefinitionFunction = @Sendable () -> FieldTag.ForeignKeyDefinition
