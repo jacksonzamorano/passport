@@ -23,7 +23,11 @@ public class SelectQueryBuilder<T: Record, A: QueryArguments> {
     }
 
     public func offset(_ count: Int) {
-        self.parameters.skip = count
+        self.parameters.skip = [.raw("\(count)")]
+    }
+
+    public func offset(_ cnd: QueryStringCondition<T, A>) {
+        self.parameters.skip = cnd.components
     }
     
     public func sortAscending(_ keyPath: KeyPath<T, Field>) {

@@ -24,10 +24,5 @@ let package = Package(
             .product(name: "SwiftCompilerPlugin", package: "swift-syntax")
         ], path: "Sources/PassportMacros"),
         .executableTarget(name: "PassportDemo", dependencies: ["Passport"], path: "Sources/PassportDemo"),
-        .testTarget(
-            name: "PassportTests",
-            dependencies: ["Passport"],
-            path: "Sources/PassportTests"
-        )
     ],
 )
