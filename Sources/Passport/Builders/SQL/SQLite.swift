@@ -31,7 +31,7 @@ public class SQLite: Dialect {
         }
     }
     public func queryParameterToken(atIndex idx: Int) -> String {
-        return "?"
+        return "?\(idx+1)"
     }
     public func buildEnumCreateCommand(enm: any Enum.Type) -> String? {
         return nil
@@ -95,8 +95,8 @@ public class SQLite: Dialect {
     public func interpolate(components: [QueryInterpolation], fullyQualify: Bool) -> [String] {
         return components.map {
             switch $0 {
-            case .argument:
-                return "?"
+            case .argument(let val):
+                return queryParameterToken(atIndex: val)
             case .field(let principal, let name):
                 if fullyQualify {
                     return "\(principal).\(name)"

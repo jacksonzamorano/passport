@@ -216,66 +216,86 @@ public class SQLBuilder {
             )
             sql = dialect.buildSelect(request: selectRequest)
         case .insert(let fields):
-            let insertVariableNames = dialect.interpolate(components: fields.enumerated().map { idx, _ in
-                return QueryInterpolation.argument(idx)
-            }, fullyQualify: false)
-            
-            let insertColumns = Column.create(fromFields: fields)
-            let insert = dialect.buildInsert(columnNames: insertColumns.map{ $0.fieldName }.joined(separator: ", "), columnValues: insertVariableNames.joined(separator: ", "), tableName:  record.recordType.name)
-            
-            let selectColumns = Column.create(fromFields: record.fields)
-            let selectColumnNames = dialect.buildColumns(columns: selectColumns, location: INSERT_TEMP_TABLE_NAME)
-            let selectRequest = SelectRequest(
-                columns: selectColumnNames,
-                location: INSERT_TEMP_TABLE_NAME,
-                params: SelectQueryParameters(),
-                ctes: [(INSERT_TEMP_TABLE_NAME, insert)],
-                joins: record.joins.map({
-                    let val = JoinRequest(
-                        join: $0,
-                        baseName: INSERT_TEMP_TABLE_NAME
-                    )
-                    return dialect.buildJoin(join: val)
-                })
-            )
-            sql = dialect.buildSelect(request: selectRequest)
-        case .update(let parameters):
-            let updateParams = parameters()
-            let update = dialect.buildUpdate(
-                update: updateParams,
-                tableName: record.recordType.name
-            )
-            var ctes = buildCTEs(from: updateParams.ctes)
-            ctes.append((UPDATE_TEMP_TABLE_NAME, update))
-            
-            let selectColumns = dialect.buildColumns(
-                columns: Column.create(fromFields: record.fields),
-                location: UPDATE_TEMP_TABLE_NAME
-            )
-            
-            var selectParams = SelectQueryParameters()
-            selectParams.returnCount = updateParams.returnCount
-            switch updateParams.returnCount {
-            case .one, .none:
-                selectParams.limit = 1
-            case .many:
-                break
+            switch record.recordType {
+            case .query:
+                let insertVariableNames = dialect.interpolate(components: fields.enumerated().map { idx, _ in
+                    return QueryInterpolation.argument(idx)
+                }, fullyQualify: false)
+                
+                let insertColumns = Column.create(fromFields: fields)
+                let insert = dialect.buildInsert(columnNames: insertColumns.map{ $0.fieldName }.joined(separator: ", "), columnValues: insertVariableNames.joined(separator: ", "), tableName:  record.recordType.name)
+                
+                let selectColumns = Column.create(fromFields: record.fields)
+                let selectColumnNames = dialect.buildColumns(columns: selectColumns, location: INSERT_TEMP_TABLE_NAME)
+                let selectRequest = SelectRequest(
+                    columns: selectColumnNames,
+                    location: INSERT_TEMP_TABLE_NAME,
+                    params: SelectQueryParameters(),
+                    ctes: [(INSERT_TEMP_TABLE_NAME, insert)],
+                    joins: record.joins.map({
+                        let val = JoinRequest(
+                            join: $0,
+                            baseName: INSERT_TEMP_TABLE_NAME
+                        )
+                        return dialect.buildJoin(join: val)
+                    })
+                )
+                sql = dialect.buildSelect(request: selectRequest)
+            case .table:
+                let insertVariableNames = dialect.interpolate(components: fields.enumerated().map { idx, _ in
+                    return QueryInterpolation.argument(idx)
+                }, fullyQualify: false)
+                let insertColumns = Column.create(fromFields: fields)
+                let insert = dialect.buildInsert(columnNames: insertColumns.map{ $0.fieldName }.joined(separator: ", "), columnValues: insertVariableNames.joined(separator: ", "), tableName:  record.recordType.name)
+                sql = insert
             }
-
-            let selectRequest = SelectRequest(
-                columns: selectColumns,
-                location: UPDATE_TEMP_TABLE_NAME,
-                params: selectParams,
-                ctes: ctes,
-                joins: record.joins.map({
-                    let val = JoinRequest(
-                        join: $0,
-                        baseName: UPDATE_TEMP_TABLE_NAME
-                    )
-                    return dialect.buildJoin(join: val)
-                })
-            )
-            sql = dialect.buildSelect(request: selectRequest)
+        case .update(let parameters):
+            switch record.recordType {
+            case .query:
+                let updateParams = parameters()
+                let update = dialect.buildUpdate(
+                    update: updateParams,
+                    tableName: record.recordType.name
+                )
+                var ctes = buildCTEs(from: updateParams.ctes)
+                ctes.append((UPDATE_TEMP_TABLE_NAME, update))
+                
+                let selectColumns = dialect.buildColumns(
+                    columns: Column.create(fromFields: record.fields),
+                    location: UPDATE_TEMP_TABLE_NAME
+                )
+                
+                var selectParams = SelectQueryParameters()
+                selectParams.returnCount = updateParams.returnCount
+                switch updateParams.returnCount {
+                case .one, .none:
+                    selectParams.limit = 1
+                case .many:
+                    break
+                }
+                
+                let selectRequest = SelectRequest(
+                    columns: selectColumns,
+                    location: UPDATE_TEMP_TABLE_NAME,
+                    params: selectParams,
+                    ctes: ctes,
+                    joins: record.joins.map({
+                        let val = JoinRequest(
+                            join: $0,
+                            baseName: UPDATE_TEMP_TABLE_NAME
+                        )
+                        return dialect.buildJoin(join: val)
+                    })
+                )
+                sql = dialect.buildSelect(request: selectRequest)
+            case .table:
+                let updateParams = parameters()
+                let update = dialect.buildUpdate(
+                    update: updateParams,
+                    tableName: record.recordType.name
+                )
+                return update
+            }
         case .delete(let parameters):
             let deleteParams = parameters()
             let delete = dialect.buildDelete(

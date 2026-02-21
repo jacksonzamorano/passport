@@ -6,6 +6,7 @@ fileprivate extension NamedQuery {
 }
 
 fileprivate let goPrefil = """
+        
         type queryable interface {
             Query(query string, args ...interface{}) (*sql.Rows, error)
         }
@@ -44,6 +45,8 @@ public class Go: Language {
 
     var config: GoConfiguration
     var sqlBuilder: SQLBuilder
+    
+    var injectedSql: Bool = false
     
     public init(sqlBuilder: SQLBuilder, config: GoConfiguration = .init()) {
         self.sqlBuilder = sqlBuilder
@@ -96,7 +99,7 @@ public class Go: Language {
     }
 
     public func build(enm: any Enum.Type, session: CodeBuildSession) throws {
-        let file = session.file(named: enm.name, withExtension: "go", prefill: goPrefil)
+        let file = session.file(named: enm.name, withExtension: "go")
         
         let variants = enm.variants.map {
             "\(enm.name)\($0.key.snakeToPascalCase()) \(enm.name) = \"\($0.value)\""
@@ -114,7 +117,6 @@ public class Go: Language {
         let file = session.file(
             named: model.name,
             withExtension: "go",
-            prefill: goPrefil
         )
         let fields = try model.fields.map {
             let extraJsonTags = $0.field.tagged(with: Self.omitEmpty) ? ",omitempty" : ""
@@ -136,8 +138,12 @@ public class Go: Language {
         let file = session.file(
             named: record.name,
             withExtension: "go",
-            prefill: goPrefil
         )
+        if !injectedSql {
+            file.append(goPrefil)
+            injectedSql = true
+        }
+        
         try build(model: record, session: session)
         
         file.append("""
@@ -219,7 +225,7 @@ public class Go: Language {
         }
     }
     public func build(routes: [ResolvedRoute], session: CodeBuildSession) throws {
-        let file = session.file(named: "\(session.schemaName)API", withExtension: "go", prefill: goPrefil)
+        let file = session.file(named: "\(session.schemaName)API", withExtension: "go")
 
         let variants = routes.map {
             """
