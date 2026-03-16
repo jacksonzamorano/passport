@@ -55,7 +55,7 @@ public struct Join<T: Record>: Sendable {
         self.condition = { base in
             return condition(
                 JoinBase(alias: base),
-                JoinThis(alias: localName),
+                JoinThis(alias: base),
                 JoinForeign(alias: alias)
             ).value
         }

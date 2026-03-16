@@ -39,7 +39,7 @@ public class Postgres: Dialect {
         case .double:
             return "DOUBLE"
         case .bytes:
-            return "BINARY"
+            return "BYTEA"
         case .datetime:
             return "TIMESTAMPTZ"
         case .int32:
@@ -58,11 +58,11 @@ public class Postgres: Dialect {
         return "$\(idx + 1)"
     }
     public func buildEnumCreateCommand(enm: any Enum.Type) -> String? {
-        let casesString = enm.variants.values.map{"\"\($0)\""}.joined(separator: ", ")
-        return "CREATE TYPE \(enm.name) AS (\(casesString))"
+        let casesString = enm.variants.values.map{"'\($0)'"}.joined(separator: ", ")
+        return "CREATE TYPE \(enm.name) AS ENUM (\(casesString))"
     }
     public func buildEnumDropCommand(enm: any Enum.Type) -> String? {
-        return "DROP TYPE \(enm.name)"
+        return "DROP TYPE IF EXISTS \(enm.name)"
     }
     public func buildCreateTableCommand(tableName: String, fields: [String]) -> String? {
         return """
