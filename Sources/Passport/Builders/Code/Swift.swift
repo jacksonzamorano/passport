@@ -4,8 +4,6 @@ public enum TargetedPlatform: Equatable {
     case bits32, bits64
 }
 
-
-
 public class Swift: Language {
     
     let fileStrategy: FileStrategy

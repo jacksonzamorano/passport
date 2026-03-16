@@ -8,7 +8,7 @@ fileprivate extension NamedQuery {
 fileprivate let goPrefil = """
         
         type queryable interface {
-            Query(query string, args ...interface{}) (*sql.Rows, error)
+            Query(query string, args ...any) (*sql.Rows, error)
         }
         
         """
