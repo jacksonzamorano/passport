@@ -23,16 +23,16 @@ public enum SQLError: Error {
 public struct SelectRequest {
     /// Comma-separated list of columns to select
     public var columns: String
-
+    
     /// The table or subquery to select from
     public var location: String
-
+    
     /// Query parameters like WHERE conditions, ORDER BY, LIMIT, etc.
     public var params: SelectQueryParameters
-
+    
     /// Common Table Expressions (WITH clauses) in order
     public var ctes: [(String, String)] = []
-
+    
     /// Array of JOIN clauses to include in the query
     public var joins: [String] = []
 }
@@ -66,12 +66,12 @@ public struct JoinRequest {
 /// let createScript = try postgres.createScript(schema: mySchema)
 /// ```
 public class SQLBuilder {
-
+    
     /// The SQL dialect used for generating database-specific SQL
     var dialect: any Dialect
     
     var scriptsDirectory: URL? = nil
-
+    
     /// Creates a new SQL builder with the specified dialect.
     ///
     /// - Parameter dialect: The SQL dialect to use (e.g., Postgres)
@@ -125,7 +125,7 @@ public class SQLBuilder {
         output += "\n\n\(dialect.endTransactionMarker)"
         return output
     }
-
+    
     /// Generates SQL for all queries defined across all records in the schema.
     ///
     /// - Parameter schema: The schema containing records with queries
@@ -153,7 +153,7 @@ public class SQLBuilder {
     public func drop(enm: any Enum.Type) -> String? {
         return dialect.buildEnumDropCommand(enm: enm)
     }
-
+    
     /// Generates a CREATE TABLE statement for a record.
     ///
     /// This method filters out computed fields (those with definitions) and generates
@@ -182,7 +182,7 @@ public class SQLBuilder {
     public func create(enm: any Enum.Type) throws -> String? {
         return dialect.buildEnumCreateCommand(enm: enm)
     }
-
+    
     /// Builds a SQL query for a given Query and Record type.
     ///
     /// This method handles all query types (SELECT, INSERT, UPDATE, DELETE) and generates
@@ -297,38 +297,48 @@ public class SQLBuilder {
                 return update
             }
         case .delete(let parameters):
-            let deleteParams = parameters()
-            let delete = dialect.buildDelete(
-                delete: deleteParams,
-                tableName: record.recordType.name
-            )
-            var ctes = buildCTEs(from: deleteParams.ctes)
-            ctes.append((DELETE_TEMP_TABLE_NAME, delete))
-            
-            let selectColumns = dialect.buildColumns(
-                columns: Column.create(fromFields: record.fields),
-                location: DELETE_TEMP_TABLE_NAME
-            )
-            let selectRequest = SelectRequest(
-                columns: selectColumns,
-                location: DELETE_TEMP_TABLE_NAME,
-                params: SelectQueryParameters(),
-                ctes: ctes,
-                joins: record.joins.map({
-                    let val = JoinRequest(
-                        join: $0,
-                        baseName: DELETE_TEMP_TABLE_NAME
-                    )
-                    return dialect.buildJoin(join: val)
-                })
-            )
-            sql = dialect.buildSelect(request: selectRequest)
+            switch record.recordType {
+            case .query:
+                let deleteParams = parameters()
+                let delete = dialect.buildDelete(
+                    delete: deleteParams,
+                    tableName: record.recordType.name
+                )
+                var ctes = buildCTEs(from: deleteParams.ctes)
+                ctes.append((DELETE_TEMP_TABLE_NAME, delete))
+                
+                let selectColumns = dialect.buildColumns(
+                    columns: Column.create(fromFields: record.fields),
+                    location: DELETE_TEMP_TABLE_NAME
+                )
+                let selectRequest = SelectRequest(
+                    columns: selectColumns,
+                    location: DELETE_TEMP_TABLE_NAME,
+                    params: SelectQueryParameters(),
+                    ctes: ctes,
+                    joins: record.joins.map({
+                        let val = JoinRequest(
+                            join: $0,
+                            baseName: DELETE_TEMP_TABLE_NAME
+                        )
+                        return dialect.buildJoin(join: val)
+                    })
+                )
+                sql = dialect.buildSelect(request: selectRequest)
+            case .table:
+                let deleteParams = parameters()
+                let delete = dialect.buildDelete(
+                    delete: deleteParams,
+                    tableName: record.recordType.name
+                )
+                return delete
+            }
         default:
             break
         }
         return sql
     }
-
+    
     private func buildCTEs(from ctes: [QueryCTE]) -> [(String, String)] {
         return ctes.map { cte in
             return (cte.name, build(query: cte.query, forRecord: cte.record))
