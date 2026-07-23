@@ -11,18 +11,10 @@ let package = Package(
         .library(name: "Passport", targets: ["Passport"])
     ],
     dependencies: [
-        .package(
-            url: "https://github.com/apple/swift-syntax.git",
-            from: "600.0.1"
-        ),
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0"),
     ],
     targets: [
-        .target(name: "Passport", dependencies: ["PassportMacros"], path: "Sources/Passport"),
-        .macro(name: "PassportMacros", dependencies: [
-            .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
-            .product(name: "SwiftCompilerPlugin", package: "swift-syntax")
-        ], path: "Sources/PassportMacros"),
+        .target(name: "Passport", path: "Sources/Passport", swiftSettings: [.enableUpcomingFeature("ApproachableConcurrency")]),
         .executableTarget(name: "PassportDemo", dependencies: ["Passport"], path: "Sources/PassportDemo"),
     ],
 )
