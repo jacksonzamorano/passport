@@ -45,6 +45,18 @@ public final class PostgreSQL: Sendable, Dialect {
         }
     }
     
+    private func buildFilters(_ filters: [Condition]) throws(DialectError) -> String? {
+        var filterStrings: [String] = []
+        for filter in filters {
+            let condition = try conditionToString(filter)
+            filterStrings.append(condition)
+        }
+        if !filterStrings.isEmpty {
+            return "WHERE \(filterStrings.joined(separator: " AND "))"
+        }
+        return nil
+    }
+    
     public func buildSelectQuery(query: SelectQuery) throws(DialectError) -> String {
         var queryComponents = ["SELECT"]
         queryComponents.append(query.fields.map{
@@ -58,14 +70,8 @@ public final class PostgreSQL: Sendable, Dialect {
             queryComponents.append(str)
         }
         
-        var filters: [String] = []
-        for filter in query.filters {
-            let condition = try conditionToString(filter)
-            filters.append(condition)
-        }
-        if !filters.isEmpty {
-            queryComponents.append("WHERE")
-            queryComponents.append(filters.joined(separator: " AND "))
+        if let filterString = try buildFilters(query.filters) {
+            queryComponents.append(filterString)
         }
         
         return queryComponents.joined(separator: " ")
@@ -84,4 +90,25 @@ public final class PostgreSQL: Sendable, Dialect {
         return queryComponents.joined(separator: " ")
     }
     
+    public func buildUpdateQuery(query: UpdateQuery) throws(DialectError) -> String {
+        var queryComponents = ["UPDATE \(query.target.tableName)"]
+        if !query.fields.isEmpty {
+            queryComponents.append("SET")
+            var sets = [String]()
+            for field in query.fields {
+                sets.append("\(field.column.columnName) = \(conditionValue(field.value))")
+            }
+            queryComponents.append(sets.joined(separator: ", "))
+        }
+        
+        if let from = query.from {
+            queryComponents.append("FROM \(from.foreignName) AS \(from.alias)")
+        }
+        
+        if let filterString = try buildFilters(query.filters) {
+            queryComponents.append(filterString)
+        }
+        
+        return queryComponents.joined(separator: " ")
+    }
 }

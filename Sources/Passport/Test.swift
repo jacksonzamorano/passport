@@ -1,6 +1,6 @@
 public struct User: Table {
     public enum Key: String, TableKey {
-        case id, email
+        case id, email, token, lastPostID
     }
     
     static public let tableName: String = "users"
@@ -9,6 +9,8 @@ public struct User: Table {
         switch key {
         case .id: .uuid().required()
         case .email: .string().required()
+        case .token: .string().nullable()
+        case .lastPostID: .uuid().nullable()
         }
     }
 }
@@ -48,4 +50,15 @@ public let InsertUserQuery = Insert(into: User.self, as: "createUser") { users, 
     let email = query.argument("email", dataType: .string)
     
     query.insert(users[.email], value: email)
+}
+
+public let UpdateLastPostID = Update(User.self, as: "upateUserLastPostID") { users, query in
+    let userID = query.argument("userID", dataType: .uuid)
+    let posts = query.from(foreign: Post.self, as: "p", kind: .left)
+    
+    query.filter {
+        .all(users[.id] == userID, posts[.userID] == users[.id])
+    }
+    
+    query.set(users[.lastPostID], value: posts[.id])
 }

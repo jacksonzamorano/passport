@@ -6,6 +6,13 @@ public indirect enum Condition: Sendable {
          equals(ConditionValue, ConditionValue),
          null(ConditionValue),
          notNull(ConditionValue)
+    
+    static public func all(_ conditions: Condition...) -> Condition {
+        return .and(conditions)
+    }
+    static public func one(_ conditions: Condition...) -> Condition {
+        return .or(conditions)
+    }
 }
 
 public indirect enum ConditionValue: Sendable {
@@ -42,8 +49,9 @@ extension Int: IntoConditionValue {
         .constant(.integer(self))
     }
 }
-extension Optional: IntoConditionValue {
+public struct Null: IntoConditionValue {
+    public init() {}
     public func toConditionValue() -> ConditionValue {
-        .constant(.null)
+        return .constant(.null)
     }
 }

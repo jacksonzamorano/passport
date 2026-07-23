@@ -16,9 +16,9 @@ public struct TableReference: Sendable {
 }
 
 public struct ColumnReference: Sendable, IntoConditionValue {
-    let source: TableReference
-    let columnName: String
-    let dataType: DataType
+    public let source: TableReference
+    public let columnName: String
+    public let dataType: DataType
     
     public func toConditionValue() -> ConditionValue {
         .column(self)
