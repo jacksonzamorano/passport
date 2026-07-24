@@ -1,7 +1,11 @@
 import Foundation
 
-public class InsertQueryBuilder<Into: Table, Return: ProjectionKey>: BaseQuery<Into, Return> {
+public class InsertQueryBuilder<Return: ProjectionKey>: BaseQuery<Return> {
     var insertFields: [InsertQuery.Field] = []
+        
+    public func into<T: Table>(_ table: T.Type, as alias: String) -> TableSource<T> {
+        return bind(table, as: alias)
+    }
     
     public func insert(_ column: ColumnReference, value: IntoConditionValue) {
         self.insertFields.append(.init(column: column, value: value.toConditionValue()))
@@ -10,11 +14,10 @@ public class InsertQueryBuilder<Into: Table, Return: ProjectionKey>: BaseQuery<I
     public func returning(_ value: IntoConditionValue, as alias: Return) {
         project(value, as: alias)
     }
-}
-extension InsertQueryBuilder where Into.Key == Return {
-    public func returnAll() {
-        for key in Into.Key.allCases {
-            project(source[key], as: key)
+    
+    public func returnAll<T: Table>(from tableSource: TableSource<T>) where T.Key == Return {
+        for key in Return.allCases {
+            returning(tableSource[key], as: key)
         }
     }
 }
@@ -22,13 +25,12 @@ extension InsertQueryBuilder where Into.Key == Return {
 public protocol Insert {
     static var name: String { get }
     
-    associatedtype From: Table
     associatedtype ReturnType: ProjectionKey
     
-    func insert(local: TableSource<From>, query: InsertQueryBuilder<From, ReturnType>)
+    func insert(query: InsertQueryBuilder<ReturnType>)
 }
 
-public typealias InsertBuilder<Into: Table, Returning: ProjectionKey> = (TableSource<Into>, inout InsertQueryBuilder<Into, Returning>) -> Void
+public typealias InsertBuilder<Returning: ProjectionKey> = (inout InsertQueryBuilder<Returning>) -> Void
 
 public final class InsertQuery: BaseQueryProperties, @unchecked Sendable {
     
@@ -40,11 +42,10 @@ public final class InsertQuery: BaseQueryProperties, @unchecked Sendable {
     public let insertFields: [Field]
     
     public init<Configuration: Insert>(configuration: Configuration) {
-        let source = TableSource(reference: .init(tableName: Configuration.From.tableName, alias: Configuration.name), table: Configuration.From.self)
-        let queryBuilder = InsertQueryBuilder<Configuration.From, Configuration.ReturnType>(name: Configuration.name, source: source)
-        configuration.insert(local: source, query: queryBuilder)
+        let queryBuilder = InsertQueryBuilder<Configuration.ReturnType>(name: Configuration.name)
+        configuration.insert(query: queryBuilder)
         
         self.insertFields = queryBuilder.insertFields
-        super.init(query: queryBuilder, target: source.reference)
+        super.init(query: queryBuilder)
     }
 }

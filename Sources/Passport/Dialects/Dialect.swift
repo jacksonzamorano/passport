@@ -13,7 +13,24 @@ public class RenderContext {
     public init() {}
 }
 
-public enum DialectError: Error {
+public enum DialectErrorCode: Int, Sendable {
     case conditionNotSupported,
          joinKindNotSupported
+    
+    var description: String {
+        switch self {
+        case .conditionNotSupported: "This dialect does not support this condition."
+        case .joinKindNotSupported: "This dialect does not support this kind of join."
+        }
+    }
+}
+
+public struct DialectError: Error {
+    let error: DialectErrorCode
+    let entityName: String
+    let context: String
+    
+    var string: String {
+        "[D\(String(format: "%0", error.rawValue))] (\(entityName)): '\(context)' \(error.description)"
+    }
 }

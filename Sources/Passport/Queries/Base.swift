@@ -1,19 +1,47 @@
 import Foundation
 
+enum QueryValidationError: Int, Error {
+    case notAllProjectionsFulfilled,
+         noTargetProvided
+    
+    var codeString: String {
+        String(format: "V%04d", rawValue+1)
+    }
+    
+    var description: String {
+        switch self {
+        case .noTargetProvided: "A target wasn't provided for this query."
+        case .notAllProjectionsFulfilled: "This query did not bind all projections to a column or expression."
+        }
+    }
+}
+
 public class BaseQueryProperties {
     public let identity: QueryIdentity
     public let arguments: [Argument]
     public let projections: [ReturnColumn]
     public let ctes: [CTE]
     
-    public let target: TableReference
+    public let target: SourceOrigin?
     
-    init<Base: Table, ReturnType: ProjectionKey>(query: BaseQuery<Base, ReturnType>, target: TableReference) {
+    private let expectedProjections: [String]
+    
+    init<ReturnType: ProjectionKey>(query: BaseQuery<ReturnType>) {
         self.identity = query.identity
         self.arguments = query.arguments
-        self.target = target
         self.projections = query.projections
         self.ctes = query.ctes
+        self.target = query.target
+        self.expectedProjections = ReturnType.allCases.map { $0.rawValue }
+    }
+    
+    func validate() throws(QueryValidationError) {
+        if Set(projections.map{ $0.alias }).count != expectedProjections.count {
+            throw .notAllProjectionsFulfilled
+        }
+        if target == nil {
+            throw .noTargetProvided
+        }
     }
 }
 
@@ -22,8 +50,7 @@ public struct ReturnColumn: Sendable {
     public let column: QueryValue
 }
 
-public class BaseQuery<Base: Table, ReturnType: ProjectionKey> {
-    internal var source: TableSource<Base>
+public class BaseQuery<ReturnType: ProjectionKey> {
     public var identity: QueryIdentity
     
     public var arguments: [Argument] = []
@@ -31,9 +58,32 @@ public class BaseQuery<Base: Table, ReturnType: ProjectionKey> {
     public var relations: [Relation] = []
     public var ctes: [CTE] = []
     
-    init(name: String, source: TableSource<Base>) {
+    public var target: SourceOrigin?
+    
+    init(name: String) {
         self.identity = .init(name: name)
-        self.source = source
+    }
+    
+    func target(_ origin: SourceOrigin) {
+        self.target = origin
+    }
+    
+    func bind<T: Table>(_ table: T.Type, as alias: String) -> TableSource<T> {
+        let tableSource = TableSource(reference: .init(tableName: T.tableName, alias: alias), table: T.self)
+        target(.table(tableSource.reference))
+        return tableSource
+    }
+    
+    func bind<Q: Insert>(_ query: Q, as alias: String) -> CTEReference<Q.ReturnType> {
+        let identifier = CTEIdentifier(relationName: alias, alias: alias)
+        ctes.append(CTE(identifier: identifier, query: .insert(.init(configuration: query))))
+        target(.cte(identifier))
+        return CTEReference(identifier: identifier, alias: alias)
+    }
+    
+    func bind<K: ProjectionKey>(_ cte: CTESource<K>, as alias: String) -> CTEReference<K> {
+        target(.cte(cte.identifier))
+        return CTEReference(identifier: cte.identifier, alias: alias)
     }
     
     public func argument(_ name: String, dataType: DataType, optional: Bool = false) -> ArgumentReference {
@@ -51,9 +101,11 @@ public class BaseQuery<Base: Table, ReturnType: ProjectionKey> {
     }
     
     public func with<T: Insert>(_ query: T, as alias: String) -> CTESource<T.ReturnType> {
-        let cte = CTE(alias: alias, query: .insert(.init(configuration: query)))
+        let identifier = CTEIdentifier(relationName: T.name, alias: alias)
+        
+        let cte = CTE(identifier: identifier, query: .insert(.init(configuration: query)))
         ctes.append(cte)
         
-        return .init(relationName: alias, alias: alias)
+        return .init(identifier: identifier)
     }
 }

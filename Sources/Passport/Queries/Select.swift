@@ -1,10 +1,19 @@
 import Foundation
 
-public class SelectQueryBuilder<From: Table, Returning: ProjectionKey>: BaseQuery<From, Returning> {
-    
+public class SelectQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> {
     
     var filters: [Condition] = []
     var joins: [Join] = []
+    
+    public func from<T: Table>(_ table: T.Type, as alias: String) -> TableSource<T> {
+        return bind(table, as: alias)
+    }
+    public func from<Query: Insert>(_ insert: Query, as alias: String) -> CTEReference<Query.ReturnType> {
+        return bind(insert, as: alias)
+    }
+    public func from<K: ProjectionKey>(_ cte: CTESource<K>, as alias: String) -> CTEReference<K> {
+        return bind(cte, as: alias)
+    }
     
     public func filter(_ build: () -> Condition) {
         filters.append(build())
@@ -29,7 +38,7 @@ public class SelectQueryBuilder<From: Table, Returning: ProjectionKey>: BaseQuer
     }
     
     public func join<Projection: ProjectionKey>(cte: CTESource<Projection>, as alias: String, kind: Join.Kind, _ build: (CTEReference<Projection>) -> Condition) -> CTEReference<Projection> {
-        let reference = CTEReference<Projection>(relationName: cte.alias, alias: alias)
+        let reference = CTEReference<Projection>(identifier: cte.identifier, alias: alias)
         let condition = build(reference)
         joins.append(
             Join(
@@ -46,23 +55,25 @@ public class SelectQueryBuilder<From: Table, Returning: ProjectionKey>: BaseQuer
     public func select(_ value: IntoConditionValue, as alias: Returning) {
         project(value, as: alias)
     }
-}
-
-extension SelectQueryBuilder where From.Key == Returning {
-    public func selectAll() {
-        for key in From.Key.allCases {
-            project(source[key], as: key)
+    
+    public func selectAll<T: Table>(from tableSource: TableSource<T>) where T.Key == Returning {
+        for key in Returning.allCases {
+            select(tableSource[key], as: key)
         }
     }
 }
 
-public protocol Select {
+
+public protocol Select: IntoSchemaItem {
     static var name: String { get }
     
-    associatedtype From: Table
     associatedtype ReturnType: ProjectionKey
     
-    func select(local: TableSource<From>, query: SelectQueryBuilder<From, ReturnType>)
+    func select(query: SelectQueryBuilder<ReturnType>)
+}
+
+public extension Select {
+    func toSchemaItem() -> SchemaItem { .query(.select(.init(configuration: self))) }
 }
 
 public final class SelectQuery: BaseQueryProperties, @unchecked Sendable {
@@ -71,12 +82,11 @@ public final class SelectQuery: BaseQueryProperties, @unchecked Sendable {
     public let joins: [Join]
     
     public init<Configuration: Select>(configuration: Configuration) {
-        let source = TableSource(reference: .init(tableName: Configuration.From.tableName, alias: Configuration.name), table: Configuration.From.self)
-        let queryBuilder = SelectQueryBuilder<Configuration.From, Configuration.ReturnType>(name: Configuration.name, source: source)
-        configuration.select(local: source, query: queryBuilder)
+        let queryBuilder = SelectQueryBuilder<Configuration.ReturnType>(name: Configuration.name)
+        configuration.select(query: queryBuilder)
         
         self.filters = queryBuilder.filters
         self.joins = queryBuilder.joins
-        super.init(query: queryBuilder, target: source.reference)
+        super.init(query: queryBuilder)
     }
 }

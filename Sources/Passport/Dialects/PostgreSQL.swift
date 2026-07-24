@@ -72,7 +72,7 @@ public final class PostgreSQL: Sendable, Dialect {
             queryComponents.append("WITH")
             var cteString = [String]()
             for cte in query.base.ctes {
-                cteString.append("\(cte.alias) AS (\(try self.buildQuery(query: cte.query, context: context)))")
+                cteString.append("\(cte.identifier.alias) AS (\(try self.buildQuery(query: cte.query, context: context)))")
             }
             queryComponents.append(cteString.joined(separator: ", "))
         }
@@ -97,7 +97,7 @@ public final class PostgreSQL: Sendable, Dialect {
             "\(self.conditionValue($0.column, argumentOffset: context.argumentCount)) AS \($0.alias)"
         }.joined(separator: ", "))
         
-        queryComponents.append("FROM \(query.target.tableName) AS \(query.target.alias)")
+        queryComponents.append("FROM \(query.target!.realName) AS \(query.target!.alias)")
         
         for join in query.joins {
             let joinKind = try joinKindToString(joinKind: join.kind)
@@ -114,7 +114,7 @@ public final class PostgreSQL: Sendable, Dialect {
     }
     
     public func buildInsertQuery(query: InsertQuery, context: RenderContext) throws(DialectError) -> String {
-        var insertQueryComponents = ["INSERT INTO \(query.target.tableName) AS \(query.target.alias)"]
+        var insertQueryComponents = ["INSERT INTO \(query.target!.realName) AS \(query.target!.alias)"]
         let insertColumnNames = query.insertFields.map {
             "\($0.column.columnName)"
         }.joined(separator: ", ")

@@ -18,35 +18,35 @@ public enum Query: Sendable {
 }
 
 public final class CTE: Sendable {
-    public let alias: String
+    public let identifier: CTEIdentifier
     public let query: Query
     
-    init(alias: String, query: Query) {
-        self.alias = alias
+    init(identifier: CTEIdentifier, query: Query) {
+        self.identifier = identifier
         self.query = query
     }
 }
 
 public final class CTESource<Values: ProjectionKey>: Sendable {
-    let relationName: String
-    let alias: String
+    let identifier: CTEIdentifier
     
-    init(relationName: String, alias: String) {
-        self.relationName = relationName
-        self.alias = alias
+    init(identifier: CTEIdentifier) {
+        self.identifier = identifier
     }
 }
 
 public final class CTEReference<Columns: ProjectionKey>: Sendable {
     let identifier: CTEIdentifier
+    let alias: String
     
-    init(relationName: String, alias: String) {
-        self.identifier = .init(relationName: relationName, alias: alias)
+    init(identifier: CTEIdentifier, alias: String) {
+        self.identifier = identifier
+        self.alias = alias
     }
     
     public subscript(_ key: Columns) -> RelationColumnReference {
         return .init(
-            relationName: identifier.alias,
+            relationName: alias,
             columnName: key.rawValue,
         )
     }

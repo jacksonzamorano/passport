@@ -5,6 +5,7 @@ public struct User: Table {
     
     static public let tableName: String = "users"
     
+    public init() {}
     static public  func column(_ key: Key) -> Column {
         switch key {
         case .id: .uuid().required()
@@ -22,6 +23,7 @@ public struct Post: Table {
     
     static public let tableName: String = "posts"
     
+    public init() {}
     static public func column(_ key: Key) -> Column {
         switch key {
         case .id: .uuid().required()
@@ -37,16 +39,16 @@ public enum SelectPostsResult: String, ProjectionKey {
 }
 public struct SelectPostsQuery: Select {
     public static let name: String = "selectPostsWithUserEmail"
-    public typealias From = Post
     public enum ReturnType: String, ProjectionKey {
         case text, userEmail
     }
     
     public init() {}
     
-    public func select(local: TableSource<Post>, query: SelectQueryBuilder<Post, ReturnType>) {
+    public func select(query: SelectQueryBuilder<ReturnType>) {
+        let posts = query.from(Post.self, as: "posts")
         let users = query.join(foreign: User.self, as: "user", kind: .inner) { user in
-            user[.id] == local[.userID]
+            user[.id] == posts[.userID]
         }
         
         let emailFilter = query.argument("email", dataType: .string)
@@ -54,21 +56,21 @@ public struct SelectPostsQuery: Select {
             users[.email] == emailFilter
         }
         
-        query.select(local[.text], as: .text)
+        query.select(posts[.text], as: .text)
         query.select(users[.email], as: .userEmail)
     }
 }
 
 public struct InsertPostQuery: Insert {
     public static let name: String = "insertPost"
-    public typealias From = Post
     public typealias ReturnType = Post.Key
     
     public init() {}
-    public func insert(local: TableSource<Post>, query: InsertQueryBuilder<Post, ReturnType>) {
+    public func insert(query: InsertQueryBuilder<ReturnType>) {
+        let posts = query.into(Post.self, as: "posts")
         let textArgument = query.argument("text", dataType: .string)
-        query.insert(local[.text], value: textArgument)
-        query.returnAll()
+        query.insert(posts[.text], value: textArgument)
+        query.returnAll(from: posts)
     }
 }
 
@@ -81,32 +83,12 @@ public struct InsertGetPostWithEmail: Select {
     
     public init() {}
     
-    public func select(local: TableSource<Post>, query: SelectQueryBuilder<Post, ReturnType>) {
-        let insertResultCTE = query.with(InsertPostQuery(), as: "inserted")
-        let insertResult = query.join(cte: insertResultCTE, as: "insert", kind: .inner) { insert in
-            insert[.id] == local[.id]
-        }
-        
+    public func select(query: SelectQueryBuilder<ReturnType>) {
+        let result = query.from(InsertPostQuery(), as: "result")
         let users = query.join(foreign: User.self, as: "user", kind: .inner) { user in
-            user[.id] == local[.userID]
+            user[.id] == result[.userID]
         }
         query.select(users[.email], as: .userEmail)
-        query.select(insertResult[.text], as: .text)
+        query.select(result[.text], as: .text)
     }
 }
-//public let InsertUserQuery = Insert(into: User.self, as: "createUser") { users, query in
-//    let email = query.argument("email", dataType: .string)
-//    
-//    query.insert(users[.email], value: email)
-//}
-//
-//public let UpdateLastPostID = Update(User.self, as: "upateUserLastPostID") { users, query in
-//    let userID = query.argument("userID", dataType: .uuid)
-//    let posts = query.from(foreign: Post.self, as: "p", kind: .left)
-//    
-//    query.filter {
-//        .all(users[.id] == userID, posts[.userID] == users[.id])
-//    }
-//    
-//    query.set(users[.lastPostID], value: posts[.id])
-//}
