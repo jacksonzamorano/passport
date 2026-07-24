@@ -2,9 +2,7 @@ import Foundation
 
 public protocol Dialect: Sendable {
     func buildQuery(query: Query, context: RenderContext) throws(DialectError) -> String
-//    func buildSelectQuery(query: SelectQuery) throws(DialectError) -> String
-//    func buildInsertQuery(query: InsertQuery) throws(DialectError) -> String
-//    func buildUpdateQuery(query: UpdateQuery) throws(DialectError) -> String
+    func buildMigrationStep(step: MigrationStep) throws(DialectError) -> String
 }
 
 public class RenderContext {
@@ -15,12 +13,14 @@ public class RenderContext {
 
 public enum DialectErrorCode: Int, Sendable {
     case conditionNotSupported,
-         joinKindNotSupported
+         joinKindNotSupported,
+         dataTypeNotSupported
     
     var description: String {
         switch self {
         case .conditionNotSupported: "This dialect does not support this condition."
         case .joinKindNotSupported: "This dialect does not support this kind of join."
+        case .dataTypeNotSupported: "This dialect does not support this data type. "
         }
     }
 }

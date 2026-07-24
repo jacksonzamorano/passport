@@ -56,6 +56,8 @@ public struct SelectPostsQuery: Select {
             users[.email] == emailFilter
         }
         
+        query.limit(10)
+        
         query.select(posts[.text], as: .text)
         query.select(users[.email], as: .userEmail)
     }
@@ -76,7 +78,6 @@ public struct InsertPostQuery: Insert {
 
 public struct InsertGetPostWithEmail: Select {
     public static let name: String = "insertAndGetPost"
-    public typealias From = Post
     public enum ReturnType: String, ProjectionKey {
         case text, userEmail
     }
@@ -90,5 +91,20 @@ public struct InsertGetPostWithEmail: Select {
         }
         query.select(users[.email], as: .userEmail)
         query.select(result[.text], as: .text)
+    }
+}
+
+public struct UpdateEmail: Update {
+    public static let name: String = "updateUserEmail"
+    public typealias ReturnType = User.Key
+    
+    public init() {}
+    
+    public func update(query: UpdateQueryBuilder<User.Key>) {
+        let users = query.update(User.self, as: "users")
+        let updateEmail = query.argument("email", dataType: .string)
+        
+        query.set(users[.email], value: updateEmail)
+        query.returnAll(from: users)
     }
 }

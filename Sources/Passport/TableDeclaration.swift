@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol TableKey: Sendable, RawRepresentable where RawValue == String {}
+public protocol TableKey: Sendable, ProjectionKey, CaseIterable, RawRepresentable where RawValue == String {}
 
 public protocol Table: Sendable, IntoSchemaItem {
     associatedtype Key: TableKey

@@ -33,6 +33,26 @@ private class SchemaRepresentation {
         
         return errors
     }
+    
+    func dialectMapMigrations(_ perform: (Migration) throws -> Void) -> [DialectError] {
+        var errors: [DialectError] = []
+        
+        for schemaItem in schemaItems {
+            switch schemaItem {
+            case .migration(let migration):
+                do {
+                    try perform(migration)
+                } catch {
+                    if let error = error as? DialectError {
+                        errors.append(error)
+                    }
+                }
+            default: break
+            }
+        }
+        
+        return errors
+    }
 }
 
 public func Schema(dialect: Dialect, @SchemaBuilder schemaItems: () -> [SchemaItem]) {
@@ -61,12 +81,19 @@ public func Schema(dialect: Dialect, @SchemaBuilder schemaItems: () -> [SchemaIt
     print(String(format: "Validated schema in %.2f seconds.", schemaSecondsTaken))
     
     let flags = Set(CommandLine.arguments.dropFirst())
-    if flags.contains("--database-statements") {
+    if flags.contains("--statements") {
         let opStart = Date()
-        let errors = schema.dialectMapQueries { query in
+        var errors = schema.dialectMapQueries { query in
             let code = try schema.dialect.buildQuery(query: query, context: .init())
             print("[\(query.base.identity.queryName)] \(code)")
         }
+        errors.append(contentsOf: schema.dialectMapMigrations{ migration in
+            for step in migration.steps {
+                let code = try schema.dialect.buildMigrationStep(step: step)
+                print("[Migration] \(code)")
+            }
+        })
+        
         if !errors.isEmpty {
             print("\(errors.count) errors found when compliling:")
             for error in errors {
@@ -81,7 +108,8 @@ public func Schema(dialect: Dialect, @SchemaBuilder schemaItems: () -> [SchemaIt
 
 public enum SchemaItem {
     case table(any Table),
-         query(Query)
+         query(Query),
+         migration(Migration)
 }
 public protocol IntoSchemaItem {
     func toSchemaItem() -> SchemaItem

@@ -3,7 +3,9 @@ import Foundation
 enum QueryValidationError: Int, Error {
     case notAllProjectionsFulfilled,
          noTargetProvided,
-         noOpCondition
+         noOpCondition,
+         noOpInsert,
+         noOpUpdate
     
     var codeString: String {
         String(format: "V%04d", rawValue+1)
@@ -14,6 +16,8 @@ enum QueryValidationError: Int, Error {
         case .noTargetProvided: "A target wasn't provided for this query."
         case .notAllProjectionsFulfilled: "This query did not bind all projections to a column or expression."
         case .noOpCondition: "A filter with no predicate produces an empty condition."
+        case .noOpInsert: "This insert does nothing."
+        case .noOpUpdate: "This update does nothing."
         }
     }
 }

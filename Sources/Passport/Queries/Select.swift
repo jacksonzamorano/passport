@@ -5,6 +5,9 @@ public class SelectQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> 
     var filters: [Condition] = []
     var joins: [Join] = []
     
+    var limit: QueryValue?
+    var offset: QueryValue?
+    
     public func from<T: Table>(_ table: T.Type, as alias: String) -> TableSource<T> {
         return bind(table, as: alias)
     }
@@ -17,6 +20,13 @@ public class SelectQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> 
     
     public func filter(_ build: () -> Condition) {
         filters.append(build())
+    }
+    
+    public func limit(_ limit: IntoConditionValue) {
+        self.limit = limit.toConditionValue()
+    }
+    public func offset(_ offset: IntoConditionValue) {
+        self.offset = offset.toConditionValue()
     }
     
     public func join<Foreign: Table>(foreign: Foreign.Type, as alias: String, kind: Join.Kind, _ build: (TableSource<Foreign>) -> Condition) -> TableSource<Foreign> {
@@ -80,13 +90,17 @@ public final class SelectQuery: BaseQueryProperties, @unchecked Sendable {
 
     public let filters: [Condition]
     public let joins: [Join]
-    
+    public var limit: QueryValue?
+    public var offset: QueryValue?
+
     public init<Configuration: Select>(configuration: Configuration) {
         let queryBuilder = SelectQueryBuilder<Configuration.ReturnType>(name: Configuration.name)
         configuration.select(query: queryBuilder)
         
         self.filters = queryBuilder.filters
         self.joins = queryBuilder.joins
+        self.limit = queryBuilder.limit
+        self.offset = queryBuilder.offset
         super.init(query: queryBuilder)
     }
     

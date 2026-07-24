@@ -6,4 +6,11 @@ Schema(dialect: PostgreSQL()) {
     
     SelectPostsQuery()
     InsertGetPostWithEmail()
+    UpdateEmail()
+    
+    Migration {
+        CreateTableMigrationStep(User.self)
+        CreateTableMigrationStep(Post.self)
+        CreateColumnMigrationStep(Post.self, column: .text)
+    }
 }

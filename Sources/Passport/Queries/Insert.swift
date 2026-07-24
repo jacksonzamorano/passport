@@ -22,12 +22,18 @@ public class InsertQueryBuilder<Return: ProjectionKey>: BaseQuery<Return> {
     }
 }
 
-public protocol Insert {
+public protocol Insert: IntoSchemaItem {
     static var name: String { get }
     
     associatedtype ReturnType: ProjectionKey
     
     func insert(query: InsertQueryBuilder<ReturnType>)
+}
+
+public extension Insert {
+    func toSchemaItem() -> SchemaItem {
+        .query(.insert(.init(configuration: self)))
+    }
 }
 
 public typealias InsertBuilder<Returning: ProjectionKey> = (inout InsertQueryBuilder<Returning>) -> Void
@@ -47,5 +53,12 @@ public final class InsertQuery: BaseQueryProperties, @unchecked Sendable {
         
         self.insertFields = queryBuilder.insertFields
         super.init(query: queryBuilder)
+    }
+    
+    override func validate() throws(QueryValidationError) {
+        try super.validate()
+        if insertFields.isEmpty {
+            throw .noOpInsert
+        }
     }
 }
