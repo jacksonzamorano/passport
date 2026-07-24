@@ -72,6 +72,9 @@ public final class PostgreSQL: Sendable, Dialect {
         if column.nullability == .notnullable {
             parts.append("NOT NULL")
         }
+        if let foreignKey = column.foreignKey {
+            parts.append("REFERENCES \(foreignKey.tableName)(\(foreignKey.columnName))")
+        }
         return parts.joined(separator: " ")
     }
     
@@ -98,6 +101,7 @@ public final class PostgreSQL: Sendable, Dialect {
 
         return queryComponents.joined(separator: " ")
     }
+    
     public func buildSelectQuery(query: SelectQuery, context: RenderContext) throws(DialectError) -> String {
         var queryComponents = ["SELECT"]
 
@@ -127,6 +131,7 @@ public final class PostgreSQL: Sendable, Dialect {
         
         return queryComponents.joined(separator: " ")
     }
+    
     public func buildInsertQuery(query: InsertQuery, context: RenderContext) throws(DialectError) -> String {
         var insertQueryComponents = ["INSERT INTO \(query.target!.realName) AS \(query.target!.alias)"]
         let insertColumnNames = query.insertFields.map {

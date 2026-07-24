@@ -28,7 +28,7 @@ public struct Post: Table {
         switch key {
         case .id: .uuid().required()
         case .text: .string()
-        case .userID: .uuid().required()
+        case .userID: .uuid().required().foreignKey(User.self, column: .id)
 //        case .userID: .requiredReference(column: User.id)
         }
     }
