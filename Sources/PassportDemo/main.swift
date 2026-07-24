@@ -2,6 +2,6 @@ import Passport
 import Foundation
 
 let postgres = PostgreSQL()
-print(try! postgres.buildSelectQuery(query: SelectPostsQuery))
-print(try! postgres.buildInsertQuery(query: InsertUserQuery))
-print(try! postgres.buildUpdateQuery(query: UpdateLastPostID))
+print(try! postgres.buildQuery(query: .select(.init(configuration: SelectPostsQuery())), context: RenderContext()))
+print(try! postgres.buildQuery(query: .select(.init(configuration: InsertGetPostWithEmail())), context: RenderContext()))
+//print(try! postgres.buildUpdateQuery(query: UpdateLastPostID))

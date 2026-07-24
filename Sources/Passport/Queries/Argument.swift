@@ -10,7 +10,7 @@ public struct ArgumentReference: Sendable, IntoConditionValue {
     var name: String
     var index: Int
  
-    public func toConditionValue() -> ConditionValue {
+    public func toConditionValue() -> QueryValue {
         return .argument(self)
     }
 }

@@ -3,23 +3,37 @@ import Foundation
 public class BaseQueryProperties {
     public let identity: QueryIdentity
     public let arguments: [Argument]
+    public let projections: [ReturnColumn]
+    public let ctes: [CTE]
     
-    public let target: any Table.Type
+    public let target: TableReference
     
-    init<T>(query: Query<T>) {
-        self.target = T.self
+    init<Base: Table, ReturnType: ProjectionKey>(query: BaseQuery<Base, ReturnType>, target: TableReference) {
         self.identity = query.identity
         self.arguments = query.arguments
+        self.target = target
+        self.projections = query.projections
+        self.ctes = query.ctes
     }
 }
 
-public class Query<Base: Table> {
-    var identity: QueryIdentity
+public struct ReturnColumn: Sendable {
+    public let alias: String
+    public let column: QueryValue
+}
+
+public class BaseQuery<Base: Table, ReturnType: ProjectionKey> {
+    internal var source: TableSource<Base>
+    public var identity: QueryIdentity
     
-    var arguments: [Argument] = []
+    public var arguments: [Argument] = []
+    public var projections: [ReturnColumn] = []
+    public var relations: [Relation] = []
+    public var ctes: [CTE] = []
     
-    init(name: String) {
+    init(name: String, source: TableSource<Base>) {
         self.identity = .init(name: name)
+        self.source = source
     }
     
     public func argument(_ name: String, dataType: DataType, optional: Bool = false) -> ArgumentReference {
@@ -30,5 +44,16 @@ public class Query<Base: Table> {
     
     public func resultTypeName(_ name: String) {
         identity.queryReturnTypeName = name
+    }
+    
+    func project(_ projectedValue: any IntoConditionValue, as alias: ReturnType) {
+        self.projections.append(.init(alias: alias.rawValue, column: projectedValue.toConditionValue()))
+    }
+    
+    public func with<T: Insert>(_ query: T, as alias: String) -> CTESource<T.ReturnType> {
+        let cte = CTE(alias: alias, query: .insert(.init(configuration: query)))
+        ctes.append(cte)
+        
+        return .init(relationName: alias, alias: alias)
     }
 }

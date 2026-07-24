@@ -3,9 +3,9 @@ import Foundation
 public indirect enum Condition: Sendable {
     case and([Condition]),
          or([Condition]),
-         equals(ConditionValue, ConditionValue),
-         null(ConditionValue),
-         notNull(ConditionValue)
+         equals(QueryValue, QueryValue),
+         null(QueryValue),
+         notNull(QueryValue)
     
     static public func all(_ conditions: Condition...) -> Condition {
         return .and(conditions)
@@ -15,10 +15,11 @@ public indirect enum Condition: Sendable {
     }
 }
 
-public indirect enum ConditionValue: Sendable {
+public indirect enum QueryValue: Sendable {
     case column(ColumnReference),
          constant(ConditionConstant),
-         argument(ArgumentReference)
+         argument(ArgumentReference),
+         relationColumn(RelationColumnReference)
 }
 
 public indirect enum ConditionConstant: Sendable {
@@ -28,7 +29,7 @@ public indirect enum ConditionConstant: Sendable {
 }
 
 public protocol IntoConditionValue {
-    func toConditionValue() -> ConditionValue
+    func toConditionValue() -> QueryValue
 }
 public func ==(lhs: any IntoConditionValue, rhs: any IntoConditionValue) -> Condition {
     return .equals(lhs.toConditionValue(), rhs.toConditionValue())
@@ -40,18 +41,18 @@ public func isNotNull(lhs: any IntoConditionValue) -> Condition {
     return .notNull(lhs.toConditionValue())
 }
 extension String: IntoConditionValue {
-    public func toConditionValue() -> ConditionValue {
+    public func toConditionValue() -> QueryValue {
         .constant(.string(self))
     }
 }
 extension Int: IntoConditionValue {
-    public func toConditionValue() -> ConditionValue {
+    public func toConditionValue() -> QueryValue {
         .constant(.integer(self))
     }
 }
 public struct Null: IntoConditionValue {
     public init() {}
-    public func toConditionValue() -> ConditionValue {
+    public func toConditionValue() -> QueryValue {
         return .constant(.null)
     }
 }

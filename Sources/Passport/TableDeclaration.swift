@@ -20,7 +20,7 @@ public struct ColumnReference: Sendable, IntoConditionValue {
     public let columnName: String
     public let dataType: DataType
     
-    public func toConditionValue() -> ConditionValue {
+    public func toConditionValue() -> QueryValue {
         .column(self)
     }
 }

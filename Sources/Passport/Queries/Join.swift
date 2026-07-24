@@ -6,6 +6,6 @@ public struct Join: Sendable {
     }
     public let kind: Join.Kind
     public let alias: String
-    public let foreignName: String
+    public let relation: SourceOrigin
     public let condition: Condition
 }
