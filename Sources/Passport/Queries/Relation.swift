@@ -53,13 +53,16 @@ public final class CTEReference<Columns: ProjectionKey>: Sendable {
     
 }
 
-public final class CTEIdentifier: Sendable {
-    let relationName: String
-    let alias: String
+public final class CTEIdentifier: Sendable, Equatable {
+    let id: UUID = UUID()
+    let name: String
     
-    init(relationName: String, alias: String) {
-        self.relationName = relationName
-        self.alias = alias
+    public static func ==(lhs: CTEIdentifier, rhs: CTEIdentifier) -> Bool {
+        lhs.id == rhs.id
+    }
+    
+    init(name: String) {
+        self.name = name
     }
 }
 

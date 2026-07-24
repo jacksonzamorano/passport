@@ -19,7 +19,7 @@ public final class PostgreSQL: Sendable, Dialect {
         case .constant(let cn):
             switch cn {
             case .integer(let i): "\(i)"
-            case .string(let s): "\"\(s)\""
+            case .string(let s): "'\(s)'"
             case .null: "NULL"
             }
         case .argument(let arg): "$\(arg.index+1+argumentOffset)"
@@ -33,13 +33,13 @@ public final class PostgreSQL: Sendable, Dialect {
             for condition in conditions {
                 subconditions.append(try conditionToString(condition, argumentOffset: argumentOffset))
             }
-            return subconditions.joined(separator: " AND ")
+            return "(\(subconditions.joined(separator: " AND ")))"
         case .or(let conditions):
             var subconditions: [String] = []
             for condition in conditions {
                 subconditions.append(try conditionToString(condition, argumentOffset: argumentOffset))
             }
-            return subconditions.joined(separator: " OR ")
+            return "(\(subconditions.joined(separator: " OR ")))"
         case .equals(let a, let b): return "\(conditionValue(a, argumentOffset: argumentOffset)) = \(conditionValue(b, argumentOffset: argumentOffset))"
         case .null(let a): return "\(conditionValue(a ,argumentOffset: argumentOffset)) IS NULL"
         case .notNull(let a): return "\(conditionValue(a, argumentOffset: argumentOffset)) IS NOT NULL"
@@ -48,7 +48,7 @@ public final class PostgreSQL: Sendable, Dialect {
     
     private func sourceToString(_ source: SourceOrigin) -> String {
         switch source {
-        case .cte(let cte): cte.relationName
+        case .cte(let cte, _ ): cte.name
         case .table(let table): table.tableName
         }
     }
@@ -72,7 +72,7 @@ public final class PostgreSQL: Sendable, Dialect {
             queryComponents.append("WITH")
             var cteString = [String]()
             for cte in query.base.ctes {
-                cteString.append("\(cte.identifier.alias) AS (\(try self.buildQuery(query: cte.query, context: context)))")
+                cteString.append("\(cte.identifier.name) AS (\(try self.buildQuery(query: cte.query, context: context)))")
             }
             queryComponents.append(cteString.joined(separator: ", "))
         }

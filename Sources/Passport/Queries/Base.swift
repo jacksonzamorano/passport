@@ -2,7 +2,8 @@ import Foundation
 
 enum QueryValidationError: Int, Error {
     case notAllProjectionsFulfilled,
-         noTargetProvided
+         noTargetProvided,
+         noOpCondition
     
     var codeString: String {
         String(format: "V%04d", rawValue+1)
@@ -12,6 +13,7 @@ enum QueryValidationError: Int, Error {
         switch self {
         case .noTargetProvided: "A target wasn't provided for this query."
         case .notAllProjectionsFulfilled: "This query did not bind all projections to a column or expression."
+        case .noOpCondition: "A filter with no predicate produces an empty condition."
         }
     }
 }
@@ -41,6 +43,9 @@ public class BaseQueryProperties {
         }
         if target == nil {
             throw .noTargetProvided
+        }
+        if case .cte(let target, _) = target, let cte = ctes.first(where: { $0.identifier == target }) {
+            try cte.query.base.validate()
         }
     }
 }
@@ -75,14 +80,14 @@ public class BaseQuery<ReturnType: ProjectionKey> {
     }
     
     func bind<Q: Insert>(_ query: Q, as alias: String) -> CTEReference<Q.ReturnType> {
-        let identifier = CTEIdentifier(relationName: alias, alias: alias)
+        let identifier = CTEIdentifier(name: alias)
         ctes.append(CTE(identifier: identifier, query: .insert(.init(configuration: query))))
-        target(.cte(identifier))
+        target(.cte(identifier, alias: alias))
         return CTEReference(identifier: identifier, alias: alias)
     }
     
     func bind<K: ProjectionKey>(_ cte: CTESource<K>, as alias: String) -> CTEReference<K> {
-        target(.cte(cte.identifier))
+        target(.cte(cte.identifier, alias: alias))
         return CTEReference(identifier: cte.identifier, alias: alias)
     }
     
@@ -101,7 +106,7 @@ public class BaseQuery<ReturnType: ProjectionKey> {
     }
     
     public func with<T: Insert>(_ query: T, as alias: String) -> CTESource<T.ReturnType> {
-        let identifier = CTEIdentifier(relationName: T.name, alias: alias)
+        let identifier = CTEIdentifier(name: alias)
         
         let cte = CTE(identifier: identifier, query: .insert(.init(configuration: query)))
         ctes.append(cte)

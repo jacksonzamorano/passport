@@ -44,7 +44,7 @@ public class SelectQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> 
             Join(
                 kind: kind,
                 alias: alias,
-                relation: .cte(reference.identifier),
+                relation: .cte(reference.identifier, alias: alias),
                 condition: condition
             )
         )
@@ -88,5 +88,15 @@ public final class SelectQuery: BaseQueryProperties, @unchecked Sendable {
         self.filters = queryBuilder.filters
         self.joins = queryBuilder.joins
         super.init(query: queryBuilder)
+    }
+    
+    override func validate() throws(QueryValidationError) {
+        try super.validate()
+        for f in filters {
+            switch f {
+            case .and(let ops) where ops.isEmpty, .or(let ops) where ops.isEmpty: throw .noOpCondition
+            default: continue
+            }
+        }
     }
 }
