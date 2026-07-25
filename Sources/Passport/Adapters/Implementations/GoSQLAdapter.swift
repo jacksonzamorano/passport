@@ -12,6 +12,5 @@ public final class GoSQLAdapter: Adapter {
     }
     
     public func buildQuery(query: BuiltQuery, inContext context: AdapterContext) throws(AdapterError) {
-        
     }
 }

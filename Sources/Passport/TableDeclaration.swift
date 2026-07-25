@@ -24,6 +24,7 @@ public struct ColumnReference: Sendable, IntoConditionValue {
     public let source: TableReference
     public let columnName: String
     public let dataType: DataType
+    public let nullability: Nullability
     
     public func toConditionValue() -> QueryValue {
         .column(self)
@@ -44,7 +45,8 @@ public final class TableSource<T: Table>: Sendable {
         return .init(
             source: self.reference,
             columnName: key.rawValue,
-            dataType: col.dataType
+            dataType: col.dataType,
+            nullability: col.nullability,
         )
     }
 }

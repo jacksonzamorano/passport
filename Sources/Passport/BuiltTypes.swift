@@ -1,6 +1,12 @@
 public struct BuiltQuery: Sendable {
     public let query: String
     public let arguments: [Argument]
+    public let returnColumns: [ReturnedProperty]
+    
+    public struct ReturnedProperty: Sendable {
+        public let name: String
+        public let fullDataType: MaterializedDataType
+    }
 }
 
 public struct BuiltMigration: Sendable {

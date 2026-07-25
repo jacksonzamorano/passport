@@ -45,7 +45,14 @@ internal class SchemaRepresentation {
             do {
                 let context = RenderContext()
                 let queryString = try dialect.buildQuery(query: query, context: context)
-                builtQueries.append(.init(query: queryString, arguments: context.arguments))
+                
+                builtQueries.append(.init(
+                    query: queryString,
+                    arguments: context.arguments,
+                    returnColumns: query.base.projections.map {
+                        .init(name: $0.alias, fullDataType: $0.column.dataType)
+                    }
+                ))
             } catch {
                 errors.errors.append(
                     .init(error: error, location: query.base.identity.queryName)

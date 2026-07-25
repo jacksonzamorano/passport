@@ -20,12 +20,30 @@ public indirect enum QueryValue: Sendable {
          constant(ConditionConstant),
          argument(ArgumentReference),
          relationColumn(RelationColumnReference)
+    
+    var dataType: MaterializedDataType {
+        switch self {
+        case .column(let column): MaterializedDataType(dataType: column.dataType, optional: column.nullability.optional)
+        case .constant(let constant): constant.dataType
+        case .argument(let argument): .init(dataType: argument.dataType, optional: argument.optional)
+//        case .relationColumn(let rcr): rcr.
+        default: fatalError("Unimplemented")
+        }
+    }
 }
 
 public indirect enum ConditionConstant: Sendable {
     case string(String),
          integer(Int),
          null
+    
+    var dataType: MaterializedDataType {
+        switch self {
+        case .integer(_): .init(dataType: .integer, optional: false)
+        case .string(_): .init(dataType: .string, optional: false)
+        case .null: .init(dataType: .integer, optional: true)
+        }
+    }
 }
 
 public protocol IntoConditionValue {

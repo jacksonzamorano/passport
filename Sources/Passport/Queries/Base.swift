@@ -98,7 +98,7 @@ public class BaseQuery<ReturnType: ProjectionKey> {
     public func argument(_ name: String, dataType: DataType, optional: Bool = false) -> ArgumentReference {
         let argument = Argument(name: name, dataType: dataType, optional: optional)
         self.arguments.append(argument)
-        return .init(name: argument.name, index: arguments.count - 1)
+        return .init(name: argument.name, index: arguments.count - 1, dataType: dataType, optional: optional)
     }
     
     public func resultTypeName(_ name: String) {

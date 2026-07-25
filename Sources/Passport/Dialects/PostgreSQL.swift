@@ -64,6 +64,7 @@ public final class PostgreSQL: Sendable, Dialect {
         switch dataType {
         case .string: "TEXT"
         case .uuid: "UUID"
+        case .integer: "INT8"
         }
     }
     private func buildColumn(_ column: Column, name: String) throws(DialectError) -> String {
