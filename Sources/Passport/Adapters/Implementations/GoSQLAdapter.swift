@@ -42,12 +42,16 @@ public final class GoSQLAdapter: AdapterBuilder {
     }
     
     public func buildQuery(query: BuiltQuery, inContext context: AdapterContext) throws(AdapterError) {
-        let file = context.file(path: "model.go", prefix: "package \(packageName)")
+        let file = context.file(
+            path: "model.go",
+            prefix: "package \(packageName)",
+            after: ["gofmt", "-w", "."]
+        )
         file.require("database/sql")
         
         var returnColumnString: [String] = []
         for column in query.returnColumns {
-            returnColumnString.append("\(goify(column.name)) \(try mapType(column.fullDataType, inFile: file))")
+            returnColumnString.append("\(goify(column.name)) \(try mapType(column.fullDataType, inFile: file)) `json:\"\(column.name)\"`")
         }
         
         var argumentsString: [String] = []

@@ -8,7 +8,12 @@ public class AdapterContext {
         self.projectPath = projectPath
     }
     
-    public func file(path: String, initialContents: String? = nil, prefix: String? = nil) -> AdapterFile {
+    public func file(
+        path: String,
+        initialContents: String? = nil,
+        prefix: String? = nil,
+        after: [String]? = nil
+    ) -> AdapterFile {
         if !FileManager.default.fileExists(atPath: projectPath.path()) {
             try? FileManager.default.createDirectory(at: projectPath, withIntermediateDirectories: true)
         }
@@ -17,7 +22,7 @@ public class AdapterContext {
             return existingFile
         }
         
-        let file = AdapterFile(projectPath: projectPath.appending(path: path), scopedPath: path, prefix: prefix)
+        let file = AdapterFile(projectPath: projectPath.appending(path: path), scopedPath: path, prefix: prefix, after: after)
         files.append(file)
         if let initialContents {
             file.write(initialContents)
@@ -28,19 +33,36 @@ public class AdapterContext {
 }
 
 public class AdapterFile {
+    enum GenerationError: Error, LocalizedError {
+        case commandFailed(String), cannotWrite
+        
+        var errorDescription: String? {
+            switch self {
+            case .commandFailed(let e): "Could not run command '\(e)'"
+            case .cannotWrite: "Cannot write to file."
+            }
+        }
+    }
+    
     private var importSet: Set<String> = Set()
     
-    private var prefix: String?
-    private var projectPath: URL
-    var scopedPath: String
-    private var fileContents: String = ""
+    private let prefix: String?
+    private let projectPath: URL
+    let scopedPath: String
+    private let after: [String]?
     
-    init(projectPath: URL, scopedPath: String, prefix: String? = nil) {
+    private var fileContents: String = ""
+
+    init(
+        projectPath: URL,
+        scopedPath: String,
+        prefix: String? = nil,
+        after: [String]? = nil
+    ) {
         self.projectPath = projectPath
         self.scopedPath = scopedPath
-        if let prefix {
-            self.prefix = prefix
-        }
+        self.prefix = prefix
+        self.after = after
     }
     
     public func write(_ contents: String) {
@@ -64,5 +86,21 @@ public class AdapterFile {
             \(fileContents)
             """)
         try contents.write(to: projectPath, atomically: true, encoding: .utf8)
+        
+        if let after {
+            let process = Process()
+            let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/sh"
+            
+            process.currentDirectoryURL = projectPath.deletingLastPathComponent()
+            process.executableURL = URL(filePath: shell)
+            process.arguments = ["-c", after.joined(separator: " ")]
+            
+            try process.run()
+            process.waitUntilExit()
+            
+            if process.terminationStatus != 0 {
+                throw GenerationError.commandFailed(after.joined(separator: " "))
+            }
+        }
     }
 }
