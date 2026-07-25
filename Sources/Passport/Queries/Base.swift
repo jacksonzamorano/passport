@@ -88,28 +88,28 @@ public class BaseQuery<ReturnType: ProjectionKey> {
         return cte
     }
     
-    func bind<T: Table>(_ table: T.Type, as alias: String) -> LocalTableReference<T> {
-        let source = TableSource(alias: alias, table: table)
+    func bind<T: Table>(_ table: T.Type, as alias: String?) -> LocalTableReference<T> {
+        let source = TableSource(alias: alias ?? table.tableName, table: table)
         target(.table(source))
         return .init(source)
     }
     
-    func bind<Q: Select>(_ query: Q, as alias: String) -> CTEReference<Q.ReturnType> {
-        let source = addSource(.select(.init(configuration: query)), name: alias)
-        target(.cte(source))
-        return .init(source, alias: alias)
+    func bind<Q: Select>(_ query: Q, as alias: String?) -> CTEReference<Q.ReturnType> {
+        return bind(.select(.init(configuration: query)), as: alias)
     }
     
-    func bind<Q: Insert>(_ query: Q, as alias: String) -> CTEReference<Q.ReturnType> {
-        let source = addSource(.insert(.init(configuration: query)), name: alias)
-        target(.cte(source))
-        return .init(source, alias: alias)
+    func bind<Q: Insert>(_ query: Q, as alias: String?) -> CTEReference<Q.ReturnType> {
+        return bind(.insert(.init(configuration: query)), as: alias)
     }
     
     func bind<Q: Update>(_ query: Q, as alias: String) -> CTEReference<Q.ReturnType> {
-        let source = addSource(.update(.init(configuration: query)), name: alias)
+        return bind(.update(.init(configuration: query)), as: alias)
+    }
+    
+    func bind<Keys: ProjectionKey>(_ query: Query, as alias: String?) -> CTEReference<Keys> {
+        let source = addSource(query, name: alias ?? query.name)
         target(.cte(source))
-        return .init(source, alias: alias)
+        return .init(source, alias: alias ?? query.name)
     }
 
     public func argument(_ name: String, dataType: DataType, optional: Bool = false) -> ArgumentReference {

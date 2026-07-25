@@ -2,6 +2,19 @@ import Foundation
 
 public final class PostgreSQL: Sendable, Dialect {
     
+    static let keywords: [String] = [
+        "select",
+        "insert",
+        "update",
+        "delete",
+        "returning"
+    ]
+    private func checkKeyword(_ val: String, context: String) throws(DialectError) {
+        if Self.keywords.contains(val.lowercased()) {
+            throw .init(code: .keywordViolated, context: "\(context): \"\(val)\"")
+        }
+    }
+    
     public init() {}
     
     private func joinKindToString(joinKind: Join.Kind) throws(DialectError) -> String {
@@ -91,12 +104,16 @@ public final class PostgreSQL: Sendable, Dialect {
     }
     
     public func buildQuery(query: Query, context: RenderContext) throws(DialectError) -> String {
+        try checkKeyword(query.base.identity.queryName, context: "Query name")
+        try checkKeyword(query.base.identity.queryReturnTypeName, context: "Query return type")
+
         var queryComponents = [String]()
         
         if !query.base.ctes.isEmpty {
             queryComponents.append("WITH")
             var cteString = [String]()
-            for cte in query.base.ctes {
+            for (idx, cte) in query.base.ctes.enumerated() {
+                try checkKeyword(cte.identity.name, context: "CTE #\(idx+1)")
                 cteString.append("\(cte.identity.name) AS (\(try self.buildQuery(query: cte.query, context: context)))")
             }
             queryComponents.append(cteString.joined(separator: ", "))

@@ -84,7 +84,7 @@ struct CompilationErrors: Error {
         let location: String
         
         public var description: String {
-            "[D\(String(format: "%0", error.code.rawValue))] (\(location)): '\(error.context)' \(error.code.description)"
+            "[\(error.code.codeString)] (\(location)): '\(error.context)' \(error.code.description)"
         }
     }
     

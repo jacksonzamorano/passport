@@ -14,13 +14,19 @@ public class RenderContext {
 public enum DialectErrorCode: Int, Sendable {
     case conditionNotSupported,
          joinKindNotSupported,
-         dataTypeNotSupported
+         dataTypeNotSupported,
+         keywordViolated
+    
+    var codeString: String {
+        "D\(String(format: "%04d", self.rawValue))"
+    }
     
     var description: String {
         switch self {
         case .conditionNotSupported: "This dialect does not support this condition."
         case .joinKindNotSupported: "This dialect does not support this kind of join."
         case .dataTypeNotSupported: "This dialect does not support this data type. "
+        case .keywordViolated: "This is a reserved keyword in this dialect and may not be used."
         }
     }
 }

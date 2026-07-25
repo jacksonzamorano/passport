@@ -14,4 +14,7 @@ public enum Query: Sendable {
         case .delete(let delete): delete
         }
     }
+    var name: String {
+        base.identity.queryName
+    }
 }

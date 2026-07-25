@@ -7,7 +7,7 @@ internal class SchemaRepresentation {
     var tables: [any Table] = []
     var adapters: [Adapter] = []
     
-    init(dialect: Dialect, schemaItems: [SchemaItem]) {
+    init<D: Dialect>(dialect: D, schemaItems: [SchemaItem]) {
         self.dialect = dialect
         for schemaItem in schemaItems {
             switch schemaItem {
@@ -51,13 +51,15 @@ internal class SchemaRepresentation {
                 let context = RenderContext()
                 let queryString = try dialect.buildQuery(query: query, context: context)
                 
-                builtQueries.append(.init(
+                let builtQuery = BuiltQuery(
                     queryName: query.base.identity.queryName,
                     queryReturnTypeName: query.base.identity.queryReturnTypeName,
                     query: queryString,
                     arguments: context.arguments,
                     returnColumns: BuiltQuery.getReturnShape(query: query, dialect: dialect)
-                ))
+                )
+                
+                builtQueries.append(builtQuery)
             } catch {
                 errors.errors.append(
                     .init(error: error, location: query.base.identity.queryName)

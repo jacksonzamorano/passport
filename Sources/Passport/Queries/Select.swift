@@ -9,10 +9,10 @@ public class SelectQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> 
     var limit: QueryValue?
     var offset: QueryValue?
     
-    public func from<T: Table>(_ table: T.Type, as alias: String) -> LocalTableReference<T> {
+    public func from<T: Table>(_ table: T.Type, as alias: String? = nil) -> LocalTableReference<T> {
         return bind(table, as: alias)
     }
-    public func from<Query: Insert>(_ insert: Query, as alias: String) -> CTEReference<Query.ReturnType> {
+    public func from<Query: Insert>(_ insert: Query, as alias: String? = nil) -> CTEReference<Query.ReturnType> {
         return bind(insert, as: alias)
     }
     

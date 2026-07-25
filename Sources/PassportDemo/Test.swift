@@ -144,7 +144,7 @@ enum FullPayment: String, ProjectionKey {
 
 
 struct InsertPayment: Select {
-    struct InsertResult: Insert {
+    struct _Insert: Insert {
         typealias ReturnType = Payment.Key
         
         func insert(query: Passport.InsertQueryBuilder<Payment.Key>) {
@@ -164,7 +164,7 @@ struct InsertPayment: Select {
     typealias ReturnType = FullPayment
     
     func select(query: SelectQueryBuilder<FullPayment>) {
-        let insert = query.from(InsertResult(), as: "insertResult")
+        let insert = query.from(_Insert())
         
         let fromUser = query.join(foreign: User.self, as: "fromUser", kind: .inner) { fromUser in
             fromUser[.id] == insert[.fromUserID]
