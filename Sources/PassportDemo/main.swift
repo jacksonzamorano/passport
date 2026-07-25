@@ -3,11 +3,13 @@ import Passport
 Schema(dialect: PostgreSQL()) {
     User()
     Post()
+    Payment()
     
     SelectPostsQuery()
     InsertGetPostWithEmail()
     UpdateEmail()
     DeletePost()
+    InsertPayment()
     
     Migration {
         CreateTableMigrationStep(User.self)

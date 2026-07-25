@@ -3,8 +3,8 @@ import Foundation
 public class InsertQueryBuilder<Return: ProjectionKey>: BaseQuery<Return> {
     var insertFields: [InsertQuery.Field] = []
         
-    public func into<T: Table>(_ table: T.Type, as alias: String) -> LocalTableReference<T> {
-        return bind(table, as: alias)
+    public func into<T: Table>(_ table: T.Type, as alias: String? = nil) -> LocalTableReference<T> {
+        return bind(table, as: alias ?? T.tableName)
     }
     
     public func insert(_ column: LocalColumnReference, value: IntoConditionValue) {

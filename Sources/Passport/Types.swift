@@ -15,6 +15,8 @@ public enum DataType: Sendable {
          string,
          integer32,
          integer64,
+         float32,
+         float64,
          uuid,
          date,
          dateWithTimezone

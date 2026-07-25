@@ -123,3 +123,34 @@ func DeletePost(database *sql.DB, postID uuid.UUID) ([]DeletePostResult, error) 
 
 	return results, nil
 }
+
+type InsertedPayment struct {
+	Id            uuid.UUID `json:"id"`
+	Amount        float64   `json:"amount"`
+	FromUserEmail string    `json:"fromUserEmail"`
+	ToUserEmail   string    `json:"toUserEmail"`
+}
+
+func InsertResult(database *sql.DB, fromUserID uuid.UUID, toUserID uuid.UUID, amount float64) ([]InsertedPayment, error) {
+	var results []InsertedPayment
+	rows, err := database.Query("WITH insert AS (INSERT INTO payments AS payments (fromUserID, toUserID, amount) VALUES ($1, $2, $3) RETURNING payments.id AS id, payments.fromUserID AS fromUserID, payments.toUserID AS toUserID, payments.amount AS amount) SELECT insert.id AS id, insert.amount AS amount, fromUser.email AS fromUserEmail, toUser.email AS toUserEmail FROM insert AS insert INNER JOIN users AS fromUser ON fromUser.id = insert.fromUserID INNER JOIN users AS toUser ON toUser.id = insert.fromUserID", fromUserID, toUserID, amount)
+	if err != nil {
+		return results, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var result InsertedPayment
+		err = rows.Scan(&result.Id, &result.Amount, &result.FromUserEmail, &result.ToUserEmail)
+		if err != nil {
+			return results, err
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return results, err
+	}
+
+	return results, nil
+}

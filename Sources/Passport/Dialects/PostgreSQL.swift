@@ -72,6 +72,8 @@ public final class PostgreSQL: Sendable, Dialect {
         case .uuid: "UUID"
         case .integer32: "INT4"
         case .integer64: "INT8"
+        case .float32: "REAL"
+        case .float64: "DOUBLE PRECISION"
         case .date: "TIMESTAMP"
         case .dateWithTimezone: "TIMESTAMPTZ"
         }
