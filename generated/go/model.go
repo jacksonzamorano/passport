@@ -10,7 +10,7 @@ type SelectPostsWithUserEmailResult struct {
 
 func SelectPostsWithUserEmail(database *sql.DB, email string) ([]SelectPostsWithUserEmailResult, error) {
 	var results []SelectPostsWithUserEmailResult
-	rows, err := database.Query("SELECT posts.text AS text, user.email AS userEmail FROM posts AS posts INNER JOIN users AS user ON user.id = posts.userID WHERE user.email = $1 LIMIT 10", email)
+	rows, err := database.Query("SELECT posts.text AS text, user.email AS userEmail FROM posts AS posts INNER JOIN users AS user ON user.id = posts.userID WHERE user.email = $1 ORDER BY posts.createdDate DESC LIMIT 10", email)
 	if err != nil {
 		return results, err
 	}
@@ -39,7 +39,7 @@ type InsertAndGetPostResult struct {
 
 func InsertAndGetPost(database *sql.DB, text string) ([]InsertAndGetPostResult, error) {
 	var results []InsertAndGetPostResult
-	rows, err := database.Query("WITH result AS (INSERT INTO posts AS posts (text) VALUES ($1) RETURNING posts.id AS id, posts.text AS text, posts.userID AS userID) SELECT user.email AS userEmail, result.text AS text FROM result AS result INNER JOIN users AS user ON user.id = result.userID", text)
+	rows, err := database.Query("WITH result AS (INSERT INTO posts AS posts (text) VALUES ($1) RETURNING posts.id AS id, posts.text AS text, posts.userID AS userID, posts.createdDate AS createdDate) SELECT user.email AS userEmail, result.text AS text FROM result AS result INNER JOIN users AS user ON user.id = result.userID", text)
 	if err != nil {
 		return results, err
 	}

@@ -82,8 +82,8 @@ public class BaseQuery<ReturnType: ProjectionKey> {
         self.target = origin
     }
     
-    func addSource<Q: Insert>(_ query: Q, name: String) -> CTESource {
-        let cte = CTESource(name: name, query: .insert(.init(configuration: query)))
+    func addSource(_ query: Query, name: String) -> CTESource {
+        let cte = CTESource(name: name, query: query)
         ctes.append(cte)
         return cte
     }
@@ -94,8 +94,20 @@ public class BaseQuery<ReturnType: ProjectionKey> {
         return .init(source)
     }
     
+    func bind<Q: Select>(_ query: Q, as alias: String) -> CTEReference<Q.ReturnType> {
+        let source = addSource(.select(.init(configuration: query)), name: alias)
+        target(.cte(source))
+        return .init(source, alias: alias)
+    }
+    
     func bind<Q: Insert>(_ query: Q, as alias: String) -> CTEReference<Q.ReturnType> {
-        let source = addSource(query, name: alias)
+        let source = addSource(.insert(.init(configuration: query)), name: alias)
+        target(.cte(source))
+        return .init(source, alias: alias)
+    }
+    
+    func bind<Q: Update>(_ query: Q, as alias: String) -> CTEReference<Q.ReturnType> {
+        let source = addSource(.update(.init(configuration: query)), name: alias)
         target(.cte(source))
         return .init(source, alias: alias)
     }
@@ -114,8 +126,16 @@ public class BaseQuery<ReturnType: ProjectionKey> {
         self.projections.append(.init(alias: alias.rawValue, column: projectedValue.toConditionValue()))
     }
     
-    public func with<T: Insert>(_ query: T, as name: String) -> CTEPointer<T.ReturnType> {
-        let cte = addSource(query, name: name)
+    public func with<Q: Select>(_ query: Q, as name: String) -> CTEPointer<Q.ReturnType> {
+        let cte = addSource(.select(.init(configuration: query)), name: name)
+        return .init(cte)
+    }
+    public func with<Q: Insert>(_ query: Q, as name: String) -> CTEPointer<Q.ReturnType> {
+        let cte = addSource(.insert(.init(configuration: query)), name: name)
+        return .init(cte)
+    }
+    public func with<Q: Update>(_ query: Q, as name: String) -> CTEPointer<Q.ReturnType> {
+        let cte = addSource(.update(.init(configuration: query)), name: name)
         return .init(cte)
     }
 }

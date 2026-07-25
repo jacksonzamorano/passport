@@ -29,6 +29,11 @@ public final class GoSQLAdapter: AdapterBuilder {
             }()
         case .integer:
             "int64"
+        case .dateWithTimezone:
+            {
+                file.require("time")
+                return "time.time"
+            }()
         }
         
         if type.optional {

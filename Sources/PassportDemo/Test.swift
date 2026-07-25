@@ -1,3 +1,5 @@
+import Passport
+
 public struct User: Table {
     public enum Key: String, TableKey {
         case id, email, token, lastPostID
@@ -18,7 +20,7 @@ public struct User: Table {
 
 public struct Post: Table {
     public enum Key: String, TableKey, ProjectionKey {
-        case id, text, userID
+        case id, text, userID, createdDate
     }
     
     static public let tableName: String = "posts"
@@ -29,6 +31,7 @@ public struct Post: Table {
         case .id: .uuid().required()
         case .text: .string()
         case .userID: .uuid().required().foreignKey(User.self, column: .id)
+        case .createdDate: .timezonedDate().required()
         }
     }
 }
@@ -57,6 +60,7 @@ public struct SelectPostsQuery: Select {
         }
         
         query.limit(10)
+        query.sort(posts[.createdDate], direction: .descending)
         
         query.select(posts[.text], as: .text)
         query.select(users[.email], as: .userEmail)

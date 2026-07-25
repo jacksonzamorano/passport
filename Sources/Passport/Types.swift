@@ -11,7 +11,7 @@ public enum Nullability: Sendable {
 }
 
 public enum DataType: Sendable {
-    case string, uuid, integer
+    case string, uuid, integer, dateWithTimezone
 }
 
 public struct DeclaredType: Sendable {

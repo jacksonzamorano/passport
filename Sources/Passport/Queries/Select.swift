@@ -4,6 +4,7 @@ public class SelectQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> 
     
     var filters: [Condition] = []
     var joins: [Join] = []
+    var sorts: [SelectQuery.Sort] = []
     
     var limit: QueryValue?
     var offset: QueryValue?
@@ -22,8 +23,16 @@ public class SelectQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> 
     public func limit(_ limit: IntoConditionValue) {
         self.limit = limit.toConditionValue()
     }
+    
     public func offset(_ offset: IntoConditionValue) {
         self.offset = offset.toConditionValue()
+    }
+    
+    public func sort(_ column: ColumnReference, direction: SelectQuery.Sort.SortDirection) {
+        self.sorts.append(.init(column: column, direction: direction))
+    }
+    public func sort(_ column: LocalColumnReference, direction: SelectQuery.Sort.SortDirection) {
+        self.sorts.append(.init(column: column.column, direction: direction))
     }
     
     public func join<T: Table>(foreign: T.Type, as alias: String, kind: Join.Kind, _ build: (TableReference<T>) -> Condition) -> TableReference<T> {
@@ -94,11 +103,21 @@ public extension Select {
 }
 
 public final class SelectQuery: BaseQueryProperties, @unchecked Sendable {
+    
+    public struct Sort: Sendable {
+        public enum SortDirection: Sendable {
+            case ascending, descending
+        }
+        
+        public var column: ColumnReference
+        public var direction: SortDirection
+    }
 
     public let filters: [Condition]
     public let joins: [Join]
-    public var limit: QueryValue?
-    public var offset: QueryValue?
+    public let sorts: [Sort]
+    public let limit: QueryValue?
+    public let offset: QueryValue?
 
     public init<Configuration: Select>(configuration: Configuration) {
         let queryBuilder = SelectQueryBuilder<Configuration.ReturnType>(name: Configuration.name)
@@ -108,6 +127,7 @@ public final class SelectQuery: BaseQueryProperties, @unchecked Sendable {
         self.joins = queryBuilder.joins
         self.limit = queryBuilder.limit
         self.offset = queryBuilder.offset
+        self.sorts = queryBuilder.sorts
         super.init(query: queryBuilder)
     }
     

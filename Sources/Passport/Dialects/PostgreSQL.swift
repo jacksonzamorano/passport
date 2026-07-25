@@ -23,6 +23,12 @@ public final class PostgreSQL: Sendable, Dialect {
         case .argument(let arg): "$\(arg.index+1+argumentOffset)"
         }
     }
+    private func sortDirection(_ dir: SelectQuery.Sort.SortDirection) -> String {
+        switch dir {
+        case .ascending: "ASC"
+        case .descending: "DESC"
+        }
+    }
     private func conditionToString(_ condition: Condition, argumentOffset: Int) throws(DialectError) -> String {
         switch condition {
         case .and(let conditions):
@@ -64,6 +70,7 @@ public final class PostgreSQL: Sendable, Dialect {
         case .string: "TEXT"
         case .uuid: "UUID"
         case .integer: "INT8"
+        case .dateWithTimezone: "TIMESTAMPTZ"
         }
     }
     private func buildColumn(_ column: Column, name: String) throws(DialectError) -> String {
@@ -120,6 +127,13 @@ public final class PostgreSQL: Sendable, Dialect {
         
         if let filterString = try buildFilters(query.filters, argumentOffset: context.argumentCount) {
             queryComponents.append(filterString)
+        }
+        
+        if !query.sorts.isEmpty {
+            queryComponents.append("ORDER BY")
+            queryComponents.append(query.sorts.map{
+                "\($0.column.sourceName).\($0.column.columnName) \(sortDirection($0.direction))"
+            }.joined(separator: ", "))
         }
         
         if let limit = query.limit {
