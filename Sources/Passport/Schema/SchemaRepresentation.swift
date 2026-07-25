@@ -2,11 +2,19 @@ import Foundation
 
 internal class SchemaRepresentation {
     var dialect: Dialect
-    var schemaItems: [SchemaItem]
+    var queries: [Query] = []
+    var migrations: [Migration] = []
+    var tables: [any Table] = []
     
     init(dialect: Dialect, schemaItems: [SchemaItem]) {
         self.dialect = dialect
-        self.schemaItems = schemaItems
+        for schemaItem in schemaItems {
+            switch schemaItem {
+            case .query(let query): queries.append(query)
+            case .migration(let migration): migrations.append(migration)
+            case .table(let table): tables.append(table)
+            }
+        }
     }
     
     func build() throws(CompilationErrors) -> BuildResult {
@@ -33,19 +41,15 @@ internal class SchemaRepresentation {
         var errors = CompilationErrors()
         var builtQueries: [BuiltQuery] = []
         
-        for schemaItem in schemaItems {
-            switch schemaItem {
-            case .query(let query):
-                do {
-                    let context = RenderContext()
-                    let queryString = try dialect.buildQuery(query: query, context: context)
-                    builtQueries.append(.init(query: queryString, arguments: context.arguments))
-                } catch {
-                    errors.errors.append(
-                        .init(error: error, location: query.base.identity.queryName)
-                    )
-                }
-            default: break
+        for query in queries {
+            do {
+                let context = RenderContext()
+                let queryString = try dialect.buildQuery(query: query, context: context)
+                builtQueries.append(.init(query: queryString, arguments: context.arguments))
+            } catch {
+                errors.errors.append(
+                    .init(error: error, location: query.base.identity.queryName)
+                )
             }
         }
         
@@ -57,25 +61,19 @@ internal class SchemaRepresentation {
     }
     
     private func buildMigrations() throws(CompilationErrors) -> [BuiltMigration] {
-        var migrations: [BuiltMigration] = []
+        var builtMigrations: [BuiltMigration] = []
         var errors = CompilationErrors()
         
-        var migrationCount = 0
-        for schemaItem in schemaItems {
-            switch schemaItem {
-            case .migration(let migration):
-                migrationCount += 1
-                do {
-                    var builtMigration = BuiltMigration(steps: [])
-                    for step in migration.steps {
-                        let result = try dialect.buildMigrationStep(step: step)
-                        builtMigration.steps.append(.init(name: step.name, query: result))
-                    }
-                    migrations.append(builtMigration)
-                } catch {
-                    errors.add(error, location: "Migration #\(migrationCount)")
+        for (idx, migration) in migrations.enumerated() {
+            do {
+                var builtMigration = BuiltMigration(steps: [])
+                for step in migration.steps {
+                    let result = try dialect.buildMigrationStep(step: step)
+                    builtMigration.steps.append(.init(name: step.name, query: result))
                 }
-            default: break
+                builtMigrations.append(builtMigration)
+            } catch {
+                errors.add(error, location: "Migration #\(idx+1)")
             }
         }
         
@@ -83,6 +81,6 @@ internal class SchemaRepresentation {
             throw errors
         }
         
-        return migrations
+        return builtMigrations
     }
 }

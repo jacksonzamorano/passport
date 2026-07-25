@@ -5,16 +5,12 @@ extension SchemaRepresentation {
         var valid = true
         
         let schemaTimeStart = Date()
-        for item in schemaItems {
-            switch item {
-            case .query(let query):
-                do {
-                    try query.base.validate()
-                } catch {
-                    print("[\(error.codeString)] (\(query.base.identity.queryName)): \(error.description)")
-                    valid = false
-                }
-            default: break
+        for query in self.queries {
+            do {
+                try query.base.validate()
+            } catch {
+                print("[\(error.codeString)] (\(query.base.identity.queryName)): \(error.description)")
+                valid = false
             }
         }
         
