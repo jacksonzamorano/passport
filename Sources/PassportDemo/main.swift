@@ -7,6 +7,7 @@ Schema(dialect: PostgreSQL()) {
     SelectPostsQuery()
     InsertGetPostWithEmail()
     UpdateEmail()
+    DeletePost()
     
     Migration {
         CreateTableMigrationStep(User.self)

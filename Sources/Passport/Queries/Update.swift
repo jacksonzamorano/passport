@@ -17,7 +17,7 @@ public class UpdateQueryBuilder<ReturnType: ProjectionKey>: BaseQuery<ReturnType
         filters.append(build())
     }
     
-        public func returning(_ value: IntoConditionValue, as alias: ReturnType) {
+    public func returning(_ value: IntoConditionValue, as alias: ReturnType) {
         project(value, as: alias)
     }
     

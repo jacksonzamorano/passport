@@ -32,7 +32,7 @@ public final class GoSQLAdapter: AdapterBuilder {
         case .dateWithTimezone:
             {
                 file.require("time")
-                return "time.time"
+                return "time.Time"
             }()
         }
         

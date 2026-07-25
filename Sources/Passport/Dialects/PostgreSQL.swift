@@ -102,6 +102,7 @@ public final class PostgreSQL: Sendable, Dialect {
         case .select(let select): try buildSelectQuery(query: select, context: context)
         case .insert(let insert): try buildInsertQuery(query: insert, context: context)
         case .update(let update): try buildUpdateQuery(query: update, context: context)
+        case .delete(let delete): try buildDeleteQuery(query: delete, context: context)
         }
         context.arguments.append(contentsOf: query.base.arguments)
         queryComponents.append(inner)
@@ -175,6 +176,24 @@ public final class PostgreSQL: Sendable, Dialect {
             queryComponents.append(sets.joined(separator: ", "))
         }
         
+        if let filterString = try buildFilters(query.filters, argumentOffset: context.argumentCount) {
+            queryComponents.append(filterString)
+        }
+        
+        if query.projections.isEmpty {
+            return queryComponents.joined(separator: " ")
+        }
+        
+        let projectionsString = query.projections
+            .map{ "\(conditionValue($0.column, argumentOffset: context.argumentCount)) AS \($0.alias)" }
+        queryComponents.append("RETURNING \(projectionsString.joined(separator: ", "))")
+        
+        return queryComponents.joined(separator: " ")
+    }
+    
+    public func buildDeleteQuery(query: DeleteQuery, context: RenderContext) throws(DialectError) -> String {
+        var queryComponents = ["DELETE FROM \(query.target!.realName) AS \(query.target!.alias)"]
+
         if let filterString = try buildFilters(query.filters, argumentOffset: context.argumentCount) {
             queryComponents.append(filterString)
         }

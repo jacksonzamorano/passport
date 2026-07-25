@@ -114,3 +114,19 @@ public struct UpdateEmail: Update {
         query.returnAll(from: users)
     }
 }
+
+struct DeletePost: Delete {
+    static let name: String = "deletePost"
+    typealias ReturnType = Post.Key
+    
+    func delete(query: DeleteQueryBuilder<Post.Key>) {
+        let posts = query.from(Post.self)
+        
+        let postID = query.argument("postID", dataType: .uuid)
+        query.filter {
+            posts[.id] == postID
+        }
+        
+        query.returnAll(from: posts)
+    }
+}

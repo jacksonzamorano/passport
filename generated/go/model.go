@@ -2,6 +2,7 @@ package main
 
 import "database/sql"
 import "github.com/google/uuid"
+import "time"
 
 type SelectPostsWithUserEmailResult struct {
 	Text      *string `json:"text"`
@@ -80,6 +81,37 @@ func UpdateUserEmail(database *sql.DB, email string) ([]UpdateUserEmailResult, e
 	for rows.Next() {
 		var result UpdateUserEmailResult
 		err = rows.Scan(&result.Id, &result.Email, &result.Token, &result.LastPostID)
+		if err != nil {
+			return results, err
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return results, err
+	}
+
+	return results, nil
+}
+
+type DeletePostResult struct {
+	Id          uuid.UUID `json:"id"`
+	Text        *string   `json:"text"`
+	UserID      uuid.UUID `json:"userID"`
+	CreatedDate time.Time `json:"createdDate"`
+}
+
+func DeletePost(database *sql.DB, postID uuid.UUID) ([]DeletePostResult, error) {
+	var results []DeletePostResult
+	rows, err := database.Query("DELETE FROM posts AS posts WHERE posts.id = $1 RETURNING posts.id AS id, posts.text AS text, posts.userID AS userID, posts.createdDate AS createdDate", postID)
+	if err != nil {
+		return results, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var result DeletePostResult
+		err = rows.Scan(&result.Id, &result.Text, &result.UserID, &result.CreatedDate)
 		if err != nil {
 			return results, err
 		}
