@@ -10,6 +10,15 @@ public final class GoSQLAdapter: AdapterBuilder {
         self.packageName = packageName
     }
     
+    public func goify(_ name: String) -> String {
+        if let first = name.first, first.isLowercase {
+            let rest = name.dropFirst()
+            return "\(name.first!.uppercased())\(rest)"
+        }
+        
+        return name
+    }
+    
     public func mapType(_ type: DeclaredType, inFile file: AdapterFile) throws(AdapterError) -> String {
         let typeString = switch type.dataType {
         case .string: "string"
@@ -38,12 +47,41 @@ public final class GoSQLAdapter: AdapterBuilder {
         
         var returnColumnString: [String] = []
         for column in query.returnColumns {
-            returnColumnString.append("\(column.name) \(try mapType(column.fullDataType, inFile: file))")
+            returnColumnString.append("\(goify(column.name)) \(try mapType(column.fullDataType, inFile: file))")
+        }
+        
+        var argumentsString: [String] = []
+        for argument in query.arguments {
+            argumentsString.append("\(argument.name) \(try mapType(argument.dataType, inFile: file))")
         }
         
         let typeCode = """
             type \(query.queryReturnTypeName) struct {
                 \(returnColumnString.joined(separator: "\n\t"))
+            }
+            
+            func \(query.queryName)(database *sql.DB, \(argumentsString.joined(separator: ", "))) ([]\(query.queryReturnTypeName), error) {
+                var results []\(query.queryReturnTypeName)
+                rows, err := database.Query("\(query.query)", \(query.arguments.map{ $0.name }.joined(separator: ", ")))
+                if err != nil {
+                    return results, err
+                }
+            
+                defer rows.Close()
+            
+                for rows.Next() {
+                    var result \(query.queryReturnTypeName)
+                    err = rows.Scan(\(query.returnColumns.map{ "&result.\(goify($0.name))" }.joined(separator: ", ")))
+                    if err != nil {
+                        return results, err
+                    }
+                }
+            
+                if err := rows.Err(); err != nil {
+                    return results, err
+                }
+            
+                return results, nil
             }
             """
         

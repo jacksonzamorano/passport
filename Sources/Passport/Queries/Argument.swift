@@ -2,8 +2,7 @@ import Foundation
 
 public struct Argument: Sendable {
     public var name: String
-    public var dataType: DataType
-    public var optional: Bool
+    public var dataType: DeclaredType
 }
 
 public struct ArgumentReference: Sendable, IntoConditionValue {
