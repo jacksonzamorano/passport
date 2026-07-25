@@ -171,7 +171,7 @@ struct InsertPayment: Select {
     typealias ReturnType = FullPayment
     
     func select(query: SelectQueryBuilder<FullPayment>) {
-        let insert = query.from(InsertResult(), as: "insert")
+        let insert = query.from(InsertResult(), as: "insertResult")
         
         let fromUser = query.join(foreign: User.self, as: "fromUser", kind: .inner) { fromUser in
             fromUser[.id] == insert[.fromUserID]
