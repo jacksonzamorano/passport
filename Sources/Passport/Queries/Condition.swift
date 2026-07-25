@@ -18,15 +18,13 @@ public indirect enum Condition: Sendable {
 public indirect enum QueryValue: Sendable {
     case column(ColumnReference),
          constant(ConditionConstant),
-         argument(ArgumentReference),
-         relationColumn(RelationColumnReference)
+         argument(ArgumentReference)
     
-    func dataType(dialect: Dialect) -> MaterializedDataType {
+    func dataType(dialect: Dialect) -> DeclaredType {
         switch self {
-        case .column(let column): MaterializedDataType(dataType: column.dataType, optional: column.nullability.optional)
+        case .column(let column): column.typeReference.resolve(dialect: dialect)
         case .constant(let constant): constant.dataType
         case .argument(let argument): .init(dataType: argument.dataType, optional: argument.optional)
-        case .relationColumn(let rcr): rcr.parentValue.dataType(dialect: dialect)
         }
     }
 }
@@ -36,7 +34,7 @@ public indirect enum ConditionConstant: Sendable {
          integer(Int),
          null
     
-    var dataType: MaterializedDataType {
+    var dataType: DeclaredType {
         switch self {
         case .integer(_): .init(dataType: .integer, optional: false)
         case .string(_): .init(dataType: .string, optional: false)
@@ -47,6 +45,9 @@ public indirect enum ConditionConstant: Sendable {
 
 public protocol IntoConditionValue {
     func toConditionValue() -> QueryValue
+}
+extension QueryValue: IntoConditionValue {
+    public func toConditionValue() -> QueryValue { self }
 }
 public func ==(lhs: any IntoConditionValue, rhs: any IntoConditionValue) -> Condition {
     return .equals(lhs.toConditionValue(), rhs.toConditionValue())

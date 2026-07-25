@@ -3,21 +3,25 @@ import Foundation
 public class InsertQueryBuilder<Return: ProjectionKey>: BaseQuery<Return> {
     var insertFields: [InsertQuery.Field] = []
         
-    public func into<T: Table>(_ table: T.Type, as alias: String) -> TableSource<T> {
+    public func into<T: Table>(_ table: T.Type, as alias: String) -> TableReference<T.Key> {
         return bind(table, as: alias)
     }
     
-    public func insert(_ column: ColumnReference, value: IntoConditionValue) {
-        self.insertFields.append(.init(column: column, value: value.toConditionValue()))
+    public func insert<T: Table>(_ column: LocalColumnReference<T>, value: IntoConditionValue) where T.Key == Return {
+        self.insertFields.append(.init(
+            column: column.column,
+            value: value.toConditionValue()
+        ))
     }
     
-    public func returning(_ value: IntoConditionValue, as alias: Return) {
+    public func returning(_ value: any IntoConditionValue, as alias: Return) {
         project(value, as: alias)
     }
     
-    public func returnAll<T: Table>(from tableSource: TableSource<T>) where T.Key == Return {
+    public func returnAll<T: Table>(_ tableSource: TableReference<T>) where T.Key == Return {
         for key in Return.allCases {
-            returning(tableSource[key], as: key)
+            let reference: ColumnReference = tableSource[key]
+            returning(reference, as: key)
         }
     }
 }

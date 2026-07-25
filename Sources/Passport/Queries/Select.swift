@@ -8,13 +8,13 @@ public class SelectQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> 
     var limit: QueryValue?
     var offset: QueryValue?
     
-    public func from<T: Table>(_ table: T.Type, as alias: String) -> TableSource<T> {
+    public func from<T: Table>(_ table: T.Type, as alias: String) -> RelationSource<T.Key> {
         return bind(table, as: alias)
     }
-    public func from<Query: Insert>(_ insert: Query, as alias: String) -> CTEReference<Query.ReturnType> {
+    public func from<Query: Insert>(_ insert: Query, as alias: String) -> RelationSource<Query.ReturnType> {
         return bind(insert, as: alias)
     }
-    public func from<K: ProjectionKey>(_ cte: CTESource<K>, as alias: String) -> CTEReference<K> {
+    public func from<K: ProjectionKey>(_ cte: RelationReference<K>, as alias: String) -> RelationSource<K> {
         return bind(cte, as: alias)
     }
     
@@ -29,40 +29,26 @@ public class SelectQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> 
         self.offset = offset.toConditionValue()
     }
     
-    public func join<Foreign: Table>(foreign: Foreign.Type, as alias: String, kind: Join.Kind, _ build: (TableSource<Foreign>) -> Condition) -> TableSource<Foreign> {
-        let source = TableSource(
-            reference: .init(tableName: foreign.tableName, alias: alias),
-            table: foreign
-        )
+    public func join<T: Table>(foreign: T.Type, as alias: String, kind: Join.Kind, _ build: (RelationSource<T.Key>) -> Condition) -> RelationSource<T.Key> {
+        let table = TableReference(tableName: T.tableName, alias: alias)
+        let relation = Relation(name: alias, source: .table(table))
+        let reference = RelationReference<T.Key>(source: relation)
+        return join(relation: reference, alias: alias, kind: kind, build)
+    }
+    
+    public func join<K: ProjectionKey>(relation: RelationReference<K>, alias: String, kind: Join.Kind, _ build: (RelationSource<K>) -> Condition) -> RelationSource<K> {
+        let source = RelationSource<K>(relation: relation.relation, alias: alias)
         let condition = build(source)
         joins.append(
             Join(
                 kind: kind,
                 alias: alias,
-                relation: .table(source.reference),
+                relation: relation.relation,
                 condition: condition
             )
         )
         
         return source
-    }
-    
-    public func join<Projection: ProjectionKey>(cte: CTESource<Projection>, as alias: String, kind: Join.Kind, _ build: (CTEReference<Projection>) -> Condition) -> CTEReference<Projection> {
-        let reference = CTEReference<Projection>(
-            source: cte,
-            alias: alias
-        )
-        let condition = build(reference)
-        joins.append(
-            Join(
-                kind: kind,
-                alias: alias,
-                relation: .cte(reference.identifier, alias: alias),
-                condition: condition
-            )
-        )
-        
-        return reference
     }
     
     public func select(_ value: IntoConditionValue, as alias: Returning) {

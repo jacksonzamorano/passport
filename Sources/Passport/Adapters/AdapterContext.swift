@@ -16,6 +16,7 @@ public class AdapterContext {
         }
         
         let file = AdapterFile(projectPath: contextPath.appending(path: path), scopedPath: path)
+        files.append(file)
         if let initialContents {
             file.write(initialContents)
         }

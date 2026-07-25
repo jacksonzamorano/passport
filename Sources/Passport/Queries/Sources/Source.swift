@@ -1,17 +1,17 @@
-public enum SourceOrigin: Sendable {
-    case table(TableReference),
-         cte(CTEIdentifier, alias: String)
+public indirect enum SourceOrigin: Sendable {
+    case table(TableSource),
+         cte(CTESource)
     
     public var realName: String {
         switch self {
         case .table(let tr): tr.tableName
-        case .cte(let cte, _): cte.name
+        case .cte(let ct): ct.identity.name
         }
     }
     public var alias: String {
         switch self {
         case .table(let tr): tr.alias
-        case .cte(_, let alias): alias
+        case .cte(let ct): ct.identity.name
         }
     }
 }

@@ -1,12 +1,66 @@
+import Foundation
+
 public struct BuiltQuery: Sendable {
     public let queryName: String
+    public let queryReturnTypeName: String
     public let query: String
     public let arguments: [Argument]
     public let returnColumns: [ReturnedProperty]
     
     public struct ReturnedProperty: Sendable {
         public let name: String
-        public let fullDataType: MaterializedDataType
+        public let fullDataType: DeclaredType
+    }
+    
+    static func getReturnShape(query: Query, dialect: any Dialect) -> [ReturnedProperty] {
+        var resolvedJoins = ReturnPrescense()
+        switch query {
+        case .select(let select):
+            for join in select.joins {
+                resolvedJoins.combine(join.identity)
+            }
+        default: break
+        }
+        return query.base.projections.map {
+            ReturnedProperty(
+                name: $0.alias,
+                fullDataType: $0.column.dataType(dialect: dialect, prescense: resolvedJoins)
+            )
+        }
+    }
+}
+
+struct ReturnPrescense {
+    class Item {
+        internal init(joinID: UUID? = nil, optional: Bool) {
+            self.joinID = joinID
+            self.optional = optional
+        }
+        
+        let joinID: UUID?
+        var optional: Bool
+    }
+    var rootOptional: Bool = false
+    var joins: [Item] = []
+    
+    mutating func combine(_ join: JoinIdentity) {
+        switch join.kind {
+        case .right:
+            rootOptional = true
+            for _join in joins { _join.optional = true }
+        default:
+            break
+        }
+        
+        let selfOptional = switch join.kind {
+        case .left: true
+        default: false
+        }
+        joins.append(.init(joinID: join.id, optional: selfOptional))
+    }
+    
+    func isOptional(joinID: UUID) -> Bool {
+        joins.first(where: { $0.joinID == joinID })?.optional ?? false
     }
 }
 

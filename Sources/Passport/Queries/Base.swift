@@ -26,10 +26,11 @@ public class BaseQueryProperties {
     public let identity: QueryIdentity
     public let arguments: [Argument]
     public let projections: [ReturnColumn]
-    public let ctes: [CTE]
+    public let ctes: [CTESource]
     
     public let target: SourceOrigin?
-    
+    public var targetGuaranteed: Bool = true
+
     private let expectedProjections: [String]
     
     init<ReturnType: ProjectionKey>(query: BaseQuery<ReturnType>) {
@@ -41,6 +42,10 @@ public class BaseQueryProperties {
         self.expectedProjections = ReturnType.allCases.map { $0.rawValue }
     }
     
+    public subscript(_ key: String) -> ReturnColumn {
+        projections.first(where: { $0.alias == key })!
+    }
+    
     func validate() throws(QueryValidationError) {
         if Set(projections.map{ $0.alias }).count != expectedProjections.count {
             throw .notAllProjectionsFulfilled
@@ -48,7 +53,7 @@ public class BaseQueryProperties {
         if target == nil {
             throw .noTargetProvided
         }
-        if case .cte(let target, _) = target, let cte = ctes.first(where: { $0.identifier == target }) {
+        if case .cte(let cteID) = target, let cte = ctes.first(where: { $0.identity.id == cteID.identity.id }) {
             try cte.query.base.validate()
         }
     }
@@ -65,7 +70,7 @@ public class BaseQuery<ReturnType: ProjectionKey> {
     public var arguments: [Argument] = []
     public var projections: [ReturnColumn] = []
     public var relations: [Relation] = []
-    public var ctes: [CTE] = []
+    public var ctes: [CTESource] = []
     
     public var target: SourceOrigin?
     
@@ -77,26 +82,24 @@ public class BaseQuery<ReturnType: ProjectionKey> {
         self.target = origin
     }
     
-    func bind<T: Table>(_ table: T.Type, as alias: String) -> TableSource<T> {
-        let tableSource = TableSource(reference: .init(tableName: T.tableName, alias: alias), table: T.self)
-        target(.table(tableSource.reference))
-        return tableSource
+    func addSource<Q: Insert>(_ query: Q, name: String) -> CTESource {
+        let cte = CTESource(name: name, query: .insert(.init(configuration: query)))
+        ctes.append(cte)
+        return cte
+    }
+    
+    func bind<T: Table>(_ table: T.Type, as alias: String) -> TableReference<T.Key> {
+        let source = TableSource(alias: alias, table: table)
+        target(.table(source))
+        return .init(source)
     }
     
     func bind<Q: Insert>(_ query: Q, as alias: String) -> CTEReference<Q.ReturnType> {
-        let source = with(query, as: alias)
-        target(.cte(source.identifier, alias: alias))
-        return CTEReference(
-            source: source,
-            alias: alias
-        )
+        let source = addSource(query, name: alias)
+        target(.cte(source))
+        return .init(source)
     }
-    
-    func bind<K: ProjectionKey>(_ cte: CTESource<K>, as alias: String) -> CTEReference<K> {
-        target(.cte(cte.identifier, alias: alias))
-        return CTEReference(source: cte, alias: alias)
-    }
-    
+
     public func argument(_ name: String, dataType: DataType, optional: Bool = false) -> ArgumentReference {
         let argument = Argument(name: name, dataType: dataType, optional: optional)
         self.arguments.append(argument)
@@ -111,17 +114,8 @@ public class BaseQuery<ReturnType: ProjectionKey> {
         self.projections.append(.init(alias: alias.rawValue, column: projectedValue.toConditionValue()))
     }
     
-    public func with<T: Insert>(_ query: T, as alias: String) -> CTESource<T.ReturnType> {
-        let identifier = CTEIdentifier(name: alias)
-        let builtCTEQuery = InsertQuery(configuration: query)
-        let cte = CTE(identifier: identifier, query: .insert(builtCTEQuery))
-        ctes.append(cte)
-        
-        var columnMap: [T.ReturnType : QueryValue] = [:]
-        for key in T.ReturnType.allCases {
-            columnMap[key] = builtCTEQuery.projections.first{ $0.alias == key.rawValue }?.column
-        }
-        
-        return .init(identifier: identifier, columnMap: columnMap)
+    public func with<T: Insert>(_ query: T, as name: String) -> CTEReference<T.ReturnType> {
+        let cte = addSource(query, name: name)
+        return .init(cte)
     }
 }

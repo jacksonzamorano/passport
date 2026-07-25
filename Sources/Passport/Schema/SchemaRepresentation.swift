@@ -34,6 +34,9 @@ internal class SchemaRepresentation {
         }
         let opEnd = -opStart.timeIntervalSinceNow
         print(String(format: "Built database code in %.2f seconds.", opEnd))
+        if errors.hasErrors {
+            throw errors
+        }
         return results
     }
     
@@ -48,11 +51,10 @@ internal class SchemaRepresentation {
                 
                 builtQueries.append(.init(
                     queryName: query.base.identity.queryName,
+                    queryReturnTypeName: query.base.identity.queryReturnTypeName,
                     query: queryString,
                     arguments: context.arguments,
-                    returnColumns: query.base.projections.map {
-                        .init(name: $0.alias, fullDataType: $0.column.dataType(dialect: dialect))
-                    }
+                    returnColumns: BuiltQuery.getReturnShape(query: query, dialect: dialect)
                 ))
             } catch {
                 errors.errors.append(

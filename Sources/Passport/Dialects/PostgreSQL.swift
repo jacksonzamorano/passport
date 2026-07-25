@@ -45,7 +45,7 @@ public final class PostgreSQL: Sendable, Dialect {
     }
     private func sourceToString(_ source: SourceOrigin) -> String {
         switch source {
-        case .cte(let cte, _ ): cte.name
+        case .cte(let cte): cte.identity.name
         case .table(let table): table.tableName
         }
     }
@@ -86,7 +86,7 @@ public final class PostgreSQL: Sendable, Dialect {
             queryComponents.append("WITH")
             var cteString = [String]()
             for cte in query.base.ctes {
-                cteString.append("\(cte.identifier.name) AS (\(try self.buildQuery(query: cte.query, context: context)))")
+                cteString.append("\(cte.identity.name) AS (\(try self.buildQuery(query: cte.query, context: context)))")
             }
             queryComponents.append(cteString.joined(separator: ", "))
         }
@@ -113,9 +113,9 @@ public final class PostgreSQL: Sendable, Dialect {
         queryComponents.append("FROM \(query.target!.realName) AS \(query.target!.alias)")
         
         for join in query.joins {
-            let joinKind = try joinKindToString(joinKind: join.kind)
+            let joinKind = try joinKindToString(joinKind: join.identity.kind)
             let joinCondition = try conditionToString(join.condition, argumentOffset: context.argumentCount)
-            let str = "\(joinKind) \(self.sourceToString(join.relation)) AS \(join.alias) ON \(joinCondition)"
+            let str = "\(joinKind) \(self.sourceToString(join.relation)) AS \(join.identity.alias) ON \(joinCondition)"
             queryComponents.append(str)
         }
         

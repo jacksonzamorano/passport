@@ -47,6 +47,7 @@ public struct SelectPostsQuery: Select {
     
     public func select(query: SelectQueryBuilder<ReturnType>) {
         let posts = query.from(Post.self, as: "posts")
+        
         let users = query.join(foreign: User.self, as: "user", kind: .inner) { user in
             user[.id] == posts[.userID]
         }
@@ -72,7 +73,8 @@ public struct InsertPostQuery: Insert {
         let posts = query.into(Post.self, as: "posts")
         let textArgument = query.argument("text", dataType: .string)
         query.insert(posts[.text], value: textArgument)
-        query.returnAll(from: posts)
+        
+        query.returnAll(from: Post.self, posts)
     }
 }
 

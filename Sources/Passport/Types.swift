@@ -14,7 +14,7 @@ public enum DataType: Sendable {
     case string, uuid, integer
 }
 
-public struct MaterializedDataType: Sendable {
-    var dataType: DataType
-    var optional: Bool
+public struct DeclaredType: Sendable {
+    public var dataType: DataType
+    public var optional: Bool
 }
