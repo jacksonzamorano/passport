@@ -32,8 +32,6 @@ public class DeleteQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> 
 
 
 public protocol Delete: IntoSchemaItem {
-    static var name: String { get }
-    
     associatedtype ReturnType: ProjectionKey
     
     func delete(query: DeleteQueryBuilder<ReturnType>)
@@ -57,7 +55,9 @@ public final class DeleteQuery: BaseQueryProperties, @unchecked Sendable {
     public let filters: [Condition]
 
     public init<Configuration: Delete>(configuration: Configuration) {
-        let queryBuilder = DeleteQueryBuilder<Configuration.ReturnType>(name: Configuration.name)
+        let name = String(describing: type(of: configuration))
+        
+        let queryBuilder = DeleteQueryBuilder<Configuration.ReturnType>(name: name)
         configuration.delete(query: queryBuilder)
         
         self.filters = queryBuilder.filters

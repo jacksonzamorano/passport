@@ -56,7 +56,6 @@ public enum SelectPostsResult: String, ProjectionKey {
     case text, userEmail
 }
 public struct SelectPostsQuery: Select {
-    public static let name: String = "selectPostsWithUserEmail"
     public enum ReturnType: String, ProjectionKey {
         case text, userEmail
     }
@@ -84,7 +83,6 @@ public struct SelectPostsQuery: Select {
 }
 
 struct InsertPostQuery: Insert {
-    static let name: String = "insertPost"
     typealias ReturnType = Post.Key
     
     func insert(query: InsertQueryBuilder<ReturnType>) {
@@ -98,7 +96,6 @@ struct InsertPostQuery: Insert {
 }
 
 struct InsertGetPostWithEmail: Select {
-    static let name: String = "insertAndGetPost"
     enum ReturnType: String, ProjectionKey {
         case text, userEmail
     }
@@ -115,7 +112,6 @@ struct InsertGetPostWithEmail: Select {
 }
 
 struct UpdateEmail: Update {
-    static let name: String = "updateUserEmail"
     typealias ReturnType = User.Key
     
     func update(query: UpdateQueryBuilder<User.Key>) {
@@ -128,7 +124,6 @@ struct UpdateEmail: Update {
 }
 
 struct DeletePost: Delete {
-    static let name: String = "deletePost"
     typealias ReturnType = Post.Key
     
     func delete(query: DeleteQueryBuilder<Post.Key>) {
@@ -150,7 +145,6 @@ enum FullPayment: String, ProjectionKey {
 
 struct InsertPayment: Select {
     struct InsertResult: Insert {
-        static let name: String = "insertResult"
         typealias ReturnType = Payment.Key
         
         func insert(query: Passport.InsertQueryBuilder<Payment.Key>) {
@@ -167,7 +161,6 @@ struct InsertPayment: Select {
         }
     }
     
-    static let name: String = "insertResult"
     typealias ReturnType = FullPayment
     
     func select(query: SelectQueryBuilder<FullPayment>) {

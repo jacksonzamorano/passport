@@ -34,8 +34,6 @@ public class InsertQueryBuilder<Return: ProjectionKey>: BaseQuery<Return> {
 }
 
 public protocol Insert: IntoSchemaItem {
-    static var name: String { get }
-    
     associatedtype ReturnType: ProjectionKey
     
     func insert(query: InsertQueryBuilder<ReturnType>)
@@ -59,7 +57,9 @@ public final class InsertQuery: BaseQueryProperties, @unchecked Sendable {
     public let insertFields: [Field]
     
     public init<Configuration: Insert>(configuration: Configuration) {
-        let queryBuilder = InsertQueryBuilder<Configuration.ReturnType>(name: Configuration.name)
+        let name = String(describing: type(of: configuration))
+        
+        let queryBuilder = InsertQueryBuilder<Configuration.ReturnType>(name: name)
         configuration.insert(query: queryBuilder)
         
         self.insertFields = queryBuilder.insertFields

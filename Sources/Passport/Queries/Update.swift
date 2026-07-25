@@ -35,8 +35,6 @@ public class UpdateQueryBuilder<ReturnType: ProjectionKey>: BaseQuery<ReturnType
 }
 
 public protocol Update: IntoSchemaItem {
-    static var name: String { get }
-    
     associatedtype ReturnType: ProjectionKey
     
     func update(query: UpdateQueryBuilder<ReturnType>)
@@ -58,7 +56,9 @@ public class UpdateQuery: BaseQueryProperties, @unchecked Sendable {
     public let filters: [Condition]
     
     init<Configuration: Update>(configuration: Configuration) {
-        let queryBuilder = UpdateQueryBuilder<Configuration.ReturnType>(name: Configuration.name)
+        let name = String(describing: type(of: configuration))
+
+        let queryBuilder = UpdateQueryBuilder<Configuration.ReturnType>(name: name)
         configuration.update(query: queryBuilder)
         
         self.setFields = queryBuilder.setFields

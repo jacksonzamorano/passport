@@ -91,8 +91,6 @@ public class SelectQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> 
 
 
 public protocol Select: IntoSchemaItem {
-    static var name: String { get }
-    
     associatedtype ReturnType: ProjectionKey
     
     func select(query: SelectQueryBuilder<ReturnType>)
@@ -120,7 +118,9 @@ public final class SelectQuery: BaseQueryProperties, @unchecked Sendable {
     public let offset: QueryValue?
 
     public init<Configuration: Select>(configuration: Configuration) {
-        let queryBuilder = SelectQueryBuilder<Configuration.ReturnType>(name: Configuration.name)
+        let name = String(describing: type(of: configuration))
+        
+        let queryBuilder = SelectQueryBuilder<Configuration.ReturnType>(name: name)
         configuration.select(query: queryBuilder)
         
         self.filters = queryBuilder.filters
