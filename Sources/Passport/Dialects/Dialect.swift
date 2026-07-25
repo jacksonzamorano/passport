@@ -26,11 +26,6 @@ public enum DialectErrorCode: Int, Sendable {
 }
 
 public struct DialectError: Error {
-    let error: DialectErrorCode
-    let entityName: String
+    let code: DialectErrorCode
     let context: String
-    
-    var string: String {
-        "[D\(String(format: "%0", error.rawValue))] (\(entityName)): '\(context)' \(error.description)"
-    }
 }

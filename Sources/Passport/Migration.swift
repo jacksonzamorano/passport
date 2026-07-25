@@ -3,6 +3,13 @@ import Foundation
 public enum MigrationStep: Sendable {
     case createTable(CreateTableMigrationStep),
          createColumn(CreateColumnMigrationStep)
+    
+    var name: String {
+        switch self {
+        case .createTable(let table): "create-\(table.table.tableName)"
+        case .createColumn(let column): "alter-\(column.table.tableName)-create-\(column.name)"
+        }
+    }
 }
 
 public protocol IntoMigrationStep {
