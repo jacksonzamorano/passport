@@ -19,7 +19,7 @@ public func Schema(
         exit(1)
     }
 
-    let flags = Set(CommandLine.arguments.dropFirst())
+//    let flags = Set(CommandLine.arguments.dropFirst())
     let build: BuildResult
     do {
         build = try schema.build()
@@ -36,5 +36,6 @@ public func Schema(
         for returnColumn in query.returnColumns {
             print("\t\(returnColumn.name) -> \(returnColumn.fullDataType.dataType) (\(returnColumn.fullDataType.optional ? "Optional" : "Required"))")
         }
+        print("\n\tQuery: \(query.query)\n---\n")
     }
 }
