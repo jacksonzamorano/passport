@@ -13,4 +13,9 @@ Schema(dialect: PostgreSQL()) {
         CreateTableMigrationStep(Post.self)
         CreateColumnMigrationStep(Post.self, column: .text)
     }
+    
+    Adapter(
+        GoSQLAdapter(),
+        generateInto: .gitRoot(appending: ["Sources", "PassportDemo", "generated", "go"])
+    )
 }

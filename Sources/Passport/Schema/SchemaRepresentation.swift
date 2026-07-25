@@ -5,6 +5,7 @@ internal class SchemaRepresentation {
     var queries: [Query] = []
     var migrations: [Migration] = []
     var tables: [any Table] = []
+    var adapters: [Adapter] = []
     
     init(dialect: Dialect, schemaItems: [SchemaItem]) {
         self.dialect = dialect
@@ -13,6 +14,7 @@ internal class SchemaRepresentation {
             case .query(let query): queries.append(query)
             case .migration(let migration): migrations.append(migration)
             case .table(let table): tables.append(table)
+            case .adapter(let adapter): adapters.append(adapter)
             }
         }
     }

@@ -31,11 +31,26 @@ public func Schema(
         return
     }
 
-    for query in build.queries {
-        print(query.queryName)
-        for returnColumn in query.returnColumns {
-            print("\t\(returnColumn.name) -> \(returnColumn.fullDataType.dataType) (\(returnColumn.fullDataType.optional ? "Optional" : "Required"))")
+    for adapter in schema.adapters {
+        do {
+            for query in build.queries {
+                try adapter.build(query: query)
+            }
+            try adapter.finalize()
+        } catch {
+            if let error = error as? AdapterError {
+                print(error.description(language: adapter.builder.name))
+            } else {
+                print("\(error.localizedDescription)")
+            }
         }
-        print("\n\tQuery: \(query.query)\n---\n")
     }
+    
+//    for query in build.queries {
+//        print(query.queryName)
+//        for returnColumn in query.returnColumns {
+//            print("\t\(returnColumn.name) -> \(returnColumn.fullDataType.dataType) (\(returnColumn.fullDataType.optional ? "Optional" : "Required"))")
+//        }
+//        print("\n\tQuery: \(query.query)\n---\n")
+//    }
 }

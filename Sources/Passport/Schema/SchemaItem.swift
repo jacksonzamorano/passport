@@ -3,7 +3,8 @@ import Foundation
 public enum SchemaItem {
     case table(any Table),
          query(Query),
-         migration(Migration)
+         migration(Migration),
+         adapter(Adapter)
 }
 
 
