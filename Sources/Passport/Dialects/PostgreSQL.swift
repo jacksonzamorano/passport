@@ -67,9 +67,12 @@ public final class PostgreSQL: Sendable, Dialect {
     }
     private func convertDataType(_ dataType: DataType) throws(DialectError) -> String {
         switch dataType {
+        case .blob: "BYTEA"
         case .string: "TEXT"
         case .uuid: "UUID"
-        case .integer: "INT8"
+        case .integer32: "INT4"
+        case .integer64: "INT8"
+        case .date: "TIMESTAMP"
         case .dateWithTimezone: "TIMESTAMPTZ"
         }
     }

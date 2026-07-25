@@ -27,9 +27,10 @@ public final class GoSQLAdapter: AdapterBuilder {
                 file.require("github.com/google/uuid")
                 return "uuid.UUID"
             }()
-        case .integer:
-            "int64"
-        case .dateWithTimezone:
+        case .integer32: "int32"
+        case .integer64: "int64"
+        case .blob: "[]byte"
+        case .date, .dateWithTimezone:
             {
                 file.require("time")
                 return "time.Time"

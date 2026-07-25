@@ -36,9 +36,9 @@ public indirect enum ConditionConstant: Sendable {
     
     var dataType: DeclaredType {
         switch self {
-        case .integer(_): .init(dataType: .integer, optional: false)
+        case .integer(_): .init(dataType: .integer64, optional: false)
         case .string(_): .init(dataType: .string, optional: false)
-        case .null: .init(dataType: .integer, optional: true)
+        case .null: .init(dataType: .integer32, optional: true)
         }
     }
 }
