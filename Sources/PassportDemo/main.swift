@@ -16,6 +16,6 @@ Schema(dialect: PostgreSQL()) {
     
     Adapter(
         GoSQLAdapter(),
-        generateInto: .gitRoot(appending: ["Sources", "PassportDemo", "generated", "go"])
+        generateInto: .gitRoot(appending: ["generated", "go"])
     )
 }

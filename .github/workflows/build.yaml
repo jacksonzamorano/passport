@@ -1,10 +1,8 @@
-name: Build and Test
+name: Build
 
 on:
   push:
-    branches: [master]
   pull_request:
-    branches: [master]
 
 jobs:
   build:
@@ -20,11 +18,16 @@ jobs:
         with:
           swift-version: "6.2"
 
-      - name: Show Swift version
-        run: swift --version
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.23'
 
       - name: Build Passport library
         run: swift build --target Passport
 
       - name: Build PassportDemo executable
-        run: swift build --target PassportDemo
+        run: swift run --target PassportDemo
+
+      - name: Build Go Generated code
+        run: cd generated/go && go build .
