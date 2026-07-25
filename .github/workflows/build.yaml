@@ -23,11 +23,11 @@ jobs:
         with:
           go-version: '1.23'
 
-      - name: Build Passport library
+      - name: Build library
         run: swift build --target Passport
 
-      - name: Build PassportDemo executable
-        run: swift run --target PassportDemo
+      - name: Run Demo
+        run: swift run
 
       - name: Build Go Generated code
         run: cd generated/go && go build .
