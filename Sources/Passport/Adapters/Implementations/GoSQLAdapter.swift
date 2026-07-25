@@ -87,6 +87,7 @@ public final class GoSQLAdapter: AdapterBuilder {
                     if err != nil {
                         return results, err
                     }
+                    results = append(results, result)
                 }
             
                 if err := rows.Err(); err != nil {
