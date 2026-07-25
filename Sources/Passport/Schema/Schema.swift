@@ -31,4 +31,10 @@ public func Schema(
         return
     }
 
+    for query in build.queries {
+        print(query.queryName)
+        for returnColumn in query.returnColumns {
+            print("\t\(returnColumn.name) -> \(returnColumn.fullDataType.dataType) (\(returnColumn.fullDataType.optional ? "Optional" : "Required"))")
+        }
+    }
 }

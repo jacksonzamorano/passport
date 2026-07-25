@@ -1,4 +1,5 @@
 public struct BuiltQuery: Sendable {
+    public let queryName: String
     public let query: String
     public let arguments: [Argument]
     public let returnColumns: [ReturnedProperty]

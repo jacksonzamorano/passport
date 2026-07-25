@@ -85,6 +85,7 @@ public class BaseQuery<ReturnType: ProjectionKey> {
     
     func bind<Q: Insert>(_ query: Q, as alias: String) -> CTEReference<Q.ReturnType> {
         let source = with(query, as: alias)
+        target(.cte(source.identifier, alias: alias))
         return CTEReference(
             source: source,
             alias: alias
