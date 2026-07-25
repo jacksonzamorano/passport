@@ -84,15 +84,16 @@ public class BaseQuery<ReturnType: ProjectionKey> {
     }
     
     func bind<Q: Insert>(_ query: Q, as alias: String) -> CTEReference<Q.ReturnType> {
-        let identifier = CTEIdentifier(name: alias)
-        ctes.append(CTE(identifier: identifier, query: .insert(.init(configuration: query))))
-        target(.cte(identifier, alias: alias))
-        return CTEReference(identifier: identifier, alias: alias)
+        let source = with(query, as: alias)
+        return CTEReference(
+            source: source,
+            alias: alias
+        )
     }
     
     func bind<K: ProjectionKey>(_ cte: CTESource<K>, as alias: String) -> CTEReference<K> {
         target(.cte(cte.identifier, alias: alias))
-        return CTEReference(identifier: cte.identifier, alias: alias)
+        return CTEReference(source: cte, alias: alias)
     }
     
     public func argument(_ name: String, dataType: DataType, optional: Bool = false) -> ArgumentReference {
@@ -111,10 +112,15 @@ public class BaseQuery<ReturnType: ProjectionKey> {
     
     public func with<T: Insert>(_ query: T, as alias: String) -> CTESource<T.ReturnType> {
         let identifier = CTEIdentifier(name: alias)
-        
-        let cte = CTE(identifier: identifier, query: .insert(.init(configuration: query)))
+        let builtCTEQuery = InsertQuery(configuration: query)
+        let cte = CTE(identifier: identifier, query: .insert(builtCTEQuery))
         ctes.append(cte)
         
-        return .init(identifier: identifier)
+        var columnMap: [T.ReturnType : QueryValue] = [:]
+        for key in T.ReturnType.allCases {
+            columnMap[key] = builtCTEQuery.projections.first{ $0.alias == key.rawValue }?.column
+        }
+        
+        return .init(identifier: identifier, columnMap: columnMap)
     }
 }

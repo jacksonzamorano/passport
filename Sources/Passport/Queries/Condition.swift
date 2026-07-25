@@ -21,13 +21,12 @@ public indirect enum QueryValue: Sendable {
          argument(ArgumentReference),
          relationColumn(RelationColumnReference)
     
-    var dataType: MaterializedDataType {
+    func dataType(dialect: Dialect) -> MaterializedDataType {
         switch self {
         case .column(let column): MaterializedDataType(dataType: column.dataType, optional: column.nullability.optional)
         case .constant(let constant): constant.dataType
         case .argument(let argument): .init(dataType: argument.dataType, optional: argument.optional)
-//        case .relationColumn(let rcr): rcr.
-        default: fatalError("Unimplemented")
+        case .relationColumn(let rcr): rcr.parentValue.dataType(dialect: dialect)
         }
     }
 }

@@ -48,7 +48,10 @@ public class SelectQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> 
     }
     
     public func join<Projection: ProjectionKey>(cte: CTESource<Projection>, as alias: String, kind: Join.Kind, _ build: (CTEReference<Projection>) -> Condition) -> CTEReference<Projection> {
-        let reference = CTEReference<Projection>(identifier: cte.identifier, alias: alias)
+        let reference = CTEReference<Projection>(
+            source: cte,
+            alias: alias
+        )
         let condition = build(reference)
         joins.append(
             Join(

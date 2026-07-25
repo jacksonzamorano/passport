@@ -50,7 +50,7 @@ internal class SchemaRepresentation {
                     query: queryString,
                     arguments: context.arguments,
                     returnColumns: query.base.projections.map {
-                        .init(name: $0.alias, fullDataType: $0.column.dataType)
+                        .init(name: $0.alias, fullDataType: $0.column.dataType(dialect: dialect))
                     }
                 ))
             } catch {

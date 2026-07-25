@@ -31,25 +31,33 @@ public final class CTE: Sendable {
 
 public final class CTESource<Values: ProjectionKey>: Sendable {
     let identifier: CTEIdentifier
-    
-    init(identifier: CTEIdentifier) {
+    let columnMap: [Values : QueryValue]
+
+    init(identifier: CTEIdentifier, columnMap: [Values : QueryValue]) {
         self.identifier = identifier
+        self.columnMap = columnMap
     }
 }
 
 public final class CTEReference<Columns: ProjectionKey>: Sendable {
     let identifier: CTEIdentifier
     let alias: String
+    let columnMap: [Columns : QueryValue]
     
-    init(identifier: CTEIdentifier, alias: String) {
-        self.identifier = identifier
+    init(
+        source: CTESource<Columns>,
+        alias: String,
+    ) {
+        self.identifier = source.identifier
         self.alias = alias
+        self.columnMap = source.columnMap
     }
     
     public subscript(_ key: Columns) -> RelationColumnReference {
         return .init(
             relationName: alias,
             columnName: key.rawValue,
+            parentValue: columnMap[key]!
         )
     }
     
@@ -72,6 +80,7 @@ public final class CTEIdentifier: Sendable, Equatable {
 public struct RelationColumnReference: Sendable, IntoConditionValue {
     let relationName: String
     let columnName: String
+    let parentValue: QueryValue
     
     public func toConditionValue() -> QueryValue {
         return .relationColumn(self)
