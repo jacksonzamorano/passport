@@ -97,7 +97,7 @@ public class BaseQuery<ReturnType: ProjectionKey> {
     func bind<Q: Insert>(_ query: Q, as alias: String) -> CTEReference<Q.ReturnType> {
         let source = addSource(query, name: alias)
         target(.cte(source))
-        return .init(source)
+        return .init(source, alias: alias)
     }
 
     public func argument(_ name: String, dataType: DataType, optional: Bool = false) -> ArgumentReference {
@@ -114,7 +114,7 @@ public class BaseQuery<ReturnType: ProjectionKey> {
         self.projections.append(.init(alias: alias.rawValue, column: projectedValue.toConditionValue()))
     }
     
-    public func with<T: Insert>(_ query: T, as name: String) -> CTEReference<T.ReturnType> {
+    public func with<T: Insert>(_ query: T, as name: String) -> CTEPointer<T.ReturnType> {
         let cte = addSource(query, name: name)
         return .init(cte)
     }

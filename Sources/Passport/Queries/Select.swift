@@ -43,11 +43,37 @@ public class SelectQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> 
         return reference
     }
     
+    public func join<K: ProjectionKey>(
+        cte: CTEPointer<K>,
+        as alias: String,
+        kind: Join.Kind,
+        _ build: (CTEReference<K>) -> Condition
+    ) -> CTEReference<K> {
+        let reference = CTEReference<K>(cte.source, alias: alias)
+        let condition = build(reference)
+        joins.append(
+            Join(
+                kind: kind,
+                alias: alias,
+                source: .cte(cte.source),
+                condition: condition
+            )
+        )
+        
+        return reference
+    }
+    
     public func select(_ value: IntoConditionValue, as alias: Returning) {
         project(value, as: alias)
     }
     
     public func selectAll<T: Table>(from tableSource: TableReference<T>) where T.Key == Returning {
+        for key in Returning.allCases {
+            select(tableSource[key], as: key)
+        }
+    }
+    
+    public func selectAll<T: Table>(from tableSource: LocalTableReference<T>) where T.Key == Returning {
         for key in Returning.allCases {
             select(tableSource[key], as: key)
         }

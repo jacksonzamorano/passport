@@ -15,18 +15,28 @@ public struct CTESource: Sendable {
     }
 }
 
-public struct CTEReference<Columns: ProjectionKey>: Sendable {
-    let identity: CTEIdentity
-    let query: Query
+public struct CTEPointer<Columns: ProjectionKey>: Sendable {
+    let source: CTESource
     
     init(_ cte: CTESource) {
+        self.source = cte
+    }
+}
+
+public struct CTEReference<Columns: ProjectionKey>: Sendable {
+    let identity: CTEIdentity
+    let alias: String
+    let query: Query
+    
+    init(_ cte: CTESource, alias: String) {
         self.identity = cte.identity
+        self.alias = alias
         self.query = cte.query
     }
     
     public subscript(_ key: Columns) -> QueryValue {
         .column(ColumnReference(
-            sourceName: identity.name,
+            sourceName: alias,
             columnName: key.rawValue,
             typeReference: .projection(query: query, columnName: key.rawValue)
         ))
