@@ -5,12 +5,12 @@ public class UpdateQueryBuilder<ReturnType: ProjectionKey>: BaseQuery<ReturnType
     var setFields: [UpdateQuery.Field] = []
     var filters: [Condition] = []
     
-    public func update<T: Table>(_ table: T.Type, as alias: String) -> TableSource<T> {
+    public func update<T: Table>(_ table: T.Type, as alias: String) -> LocalTableReference<T> {
         return bind(table, as: alias)
     }
 
-    public func set(_ column: ColumnReference, value: IntoConditionValue) {
-        self.setFields.append(.init(column: column, value: value.toConditionValue()))
+    public func set(_ column: LocalColumnReference, value: any IntoConditionValue) {
+        self.setFields.append(.init(column: column.column, value: value.toConditionValue()))
     }
     
     public func filter(_ build: () -> Condition) {
@@ -21,9 +21,15 @@ public class UpdateQueryBuilder<ReturnType: ProjectionKey>: BaseQuery<ReturnType
         project(value, as: alias)
     }
     
-    public func returnAll<T: Table>(from tableSource: TableSource<T>) where T.Key == ReturnType {
+    public func returnAll<T: Table>(from reference: TableReference<T>) where T.Key == ReturnType {
         for key in ReturnType.allCases {
-            returning(tableSource[key], as: key)
+            returning(reference[key], as: key)
+        }
+    }
+    
+    public func returnAll<T: Table>(from reference: LocalTableReference<T>) where T.Key == ReturnType {
+        for key in ReturnType.allCases {
+            returning(reference[key].column, as: key)
         }
     }
 }

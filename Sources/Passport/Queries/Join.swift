@@ -18,8 +18,9 @@ public struct Join: Sendable {
             }
         }
     }
+    public let id = UUID()
     public let kind: Join.Kind
     public let alias: String
-    public let relation: Relation
+    public let source: SourceOrigin
     public let condition: Condition
 }

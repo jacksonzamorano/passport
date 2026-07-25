@@ -17,14 +17,14 @@ public struct BuiltQuery: Sendable {
         switch query {
         case .select(let select):
             for join in select.joins {
-                resolvedJoins.combine(join.identity)
+                resolvedJoins.combine(join)
             }
         default: break
         }
         return query.base.projections.map {
             ReturnedProperty(
                 name: $0.alias,
-                fullDataType: $0.column.dataType(dialect: dialect, prescense: resolvedJoins)
+                fullDataType: $0.column.dataType(dialect: dialect)
             )
         }
     }
@@ -43,7 +43,7 @@ struct ReturnPrescense {
     var rootOptional: Bool = false
     var joins: [Item] = []
     
-    mutating func combine(_ join: JoinIdentity) {
+    mutating func combine(_ join: Join) {
         switch join.kind {
         case .right:
             rootOptional = true

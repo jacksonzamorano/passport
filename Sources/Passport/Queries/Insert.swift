@@ -3,11 +3,11 @@ import Foundation
 public class InsertQueryBuilder<Return: ProjectionKey>: BaseQuery<Return> {
     var insertFields: [InsertQuery.Field] = []
         
-    public func into<T: Table>(_ table: T.Type, as alias: String) -> TableReference<T.Key> {
+    public func into<T: Table>(_ table: T.Type, as alias: String) -> LocalTableReference<T> {
         return bind(table, as: alias)
     }
     
-    public func insert<T: Table>(_ column: LocalColumnReference<T>, value: IntoConditionValue) where T.Key == Return {
+    public func insert(_ column: LocalColumnReference, value: IntoConditionValue) {
         self.insertFields.append(.init(
             column: column.column,
             value: value.toConditionValue()
@@ -21,6 +21,13 @@ public class InsertQueryBuilder<Return: ProjectionKey>: BaseQuery<Return> {
     public func returnAll<T: Table>(_ tableSource: TableReference<T>) where T.Key == Return {
         for key in Return.allCases {
             let reference: ColumnReference = tableSource[key]
+            returning(reference, as: key)
+        }
+    }
+    
+    public func returnAll<T: Table>(_ tableSource: LocalTableReference<T>) where T.Key == Return {
+        for key in Return.allCases {
+            let reference: ColumnReference = tableSource[key].column
             returning(reference, as: key)
         }
     }

@@ -71,10 +71,11 @@ public struct InsertPostQuery: Insert {
     public init() {}
     public func insert(query: InsertQueryBuilder<ReturnType>) {
         let posts = query.into(Post.self, as: "posts")
+        
         let textArgument = query.argument("text", dataType: .string)
         query.insert(posts[.text], value: textArgument)
         
-        query.returnAll(from: Post.self, posts)
+        query.returnAll(posts)
     }
 }
 

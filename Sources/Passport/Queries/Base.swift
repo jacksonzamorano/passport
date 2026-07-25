@@ -88,7 +88,7 @@ public class BaseQuery<ReturnType: ProjectionKey> {
         return cte
     }
     
-    func bind<T: Table>(_ table: T.Type, as alias: String) -> TableReference<T.Key> {
+    func bind<T: Table>(_ table: T.Type, as alias: String) -> LocalTableReference<T> {
         let source = TableSource(alias: alias, table: table)
         target(.table(source))
         return .init(source)

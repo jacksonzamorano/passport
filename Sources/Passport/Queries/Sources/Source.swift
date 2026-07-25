@@ -4,7 +4,7 @@ public indirect enum SourceOrigin: Sendable {
     
     public var realName: String {
         switch self {
-        case .table(let tr): tr.tableName
+        case .table(let tr): tr.table.tableName
         case .cte(let ct): ct.identity.name
         }
     }

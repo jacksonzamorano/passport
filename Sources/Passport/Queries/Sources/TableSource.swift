@@ -6,8 +6,12 @@ public struct TableSource: Sendable {
     public let table: any Table.Type
 }
 
-public struct LocalColumnReference<T: Table>: Sendable {
+public struct LocalColumnReference: Sendable, IntoConditionValue {
     public let column: ColumnReference
+    
+    public func toConditionValue() -> QueryValue {
+        return column.toConditionValue()
+    }
 }
 
 public struct TableReference<T: Table> {
@@ -27,9 +31,25 @@ public struct TableReference<T: Table> {
             typeReference: .declared(.init(dataType: column.dataType, optional: column.nullability.optional))
         )
     }
-    public subscript(_ key: T.Key) -> LocalColumnReference<T> {
+}
+
+public struct LocalTableReference<T: Table> {
+    let alias: String
+    let table: T.Type
+    
+    init(_ source: TableSource) {
+        self.alias = source.alias
+        self.table = T.self
+    }
+    
+    public subscript(_ key: T.Key) -> LocalColumnReference {
+        let column = table.column(key)
         return LocalColumnReference(
-            column: self[key]
+            column: ColumnReference(
+                sourceName: alias,
+                columnName: key.rawValue,
+                typeReference: .declared(.init(dataType: column.dataType, optional: column.nullability.optional))
+            )
         )
     }
 }

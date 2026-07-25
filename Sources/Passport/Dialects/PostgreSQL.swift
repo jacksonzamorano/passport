@@ -13,8 +13,7 @@ public final class PostgreSQL: Sendable, Dialect {
     }
     private func conditionValue(_ cv: QueryValue, argumentOffset: Int) -> String {
         switch cv {
-        case .column(let cr): "\(cr.source.alias).\(cr.columnName)"
-        case .relationColumn(let rc): "\(rc.relationName).\(rc.columnName)"
+        case .column(let cr): "\(cr.sourceName).\(cr.columnName)"
         case .constant(let cn):
             switch cn {
             case .integer(let i): "\(i)"
@@ -46,7 +45,7 @@ public final class PostgreSQL: Sendable, Dialect {
     private func sourceToString(_ source: SourceOrigin) -> String {
         switch source {
         case .cte(let cte): cte.identity.name
-        case .table(let table): table.tableName
+        case .table(let table): table.table.tableName
         }
     }
     private func buildFilters(_ filters: [Condition], argumentOffset: Int) throws(DialectError) -> String? {
@@ -113,9 +112,9 @@ public final class PostgreSQL: Sendable, Dialect {
         queryComponents.append("FROM \(query.target!.realName) AS \(query.target!.alias)")
         
         for join in query.joins {
-            let joinKind = try joinKindToString(joinKind: join.identity.kind)
+            let joinKind = try joinKindToString(joinKind: join.kind)
             let joinCondition = try conditionToString(join.condition, argumentOffset: context.argumentCount)
-            let str = "\(joinKind) \(self.sourceToString(join.relation)) AS \(join.identity.alias) ON \(joinCondition)"
+            let str = "\(joinKind) \(self.sourceToString(join.source)) AS \(join.alias) ON \(joinCondition)"
             queryComponents.append(str)
         }
         
