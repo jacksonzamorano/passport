@@ -177,7 +177,7 @@ struct InsertPayment: Select {
             fromUser[.id] == insert[.fromUserID]
         }
         let toUser = query.join(foreign: User.self, as: "toUser", kind: .inner) { toUser in
-            toUser[.id] == insert[.fromUserID]
+            toUser[.id] == insert[.toUserID]
         }
         
         query.resultTypeName("InsertedPayment")
