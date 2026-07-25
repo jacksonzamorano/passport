@@ -27,8 +27,8 @@ public final class GoSQLAdapter: AdapterBuilder {
                 file.require("github.com/google/uuid")
                 return "uuid.UUID"
             }()
-        case .integer32: "i32"
-        case .integer64: "i64"
+        case .integer32: "int32"
+        case .integer64: "int64"
         case .float32: "float32"
         case .float64: "float64"
         case .blob: "[]byte"
