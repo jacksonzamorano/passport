@@ -60,11 +60,11 @@ public final class GoSQLAdapter: AdapterBuilder {
         }
         
         let typeCode = """
-            type \(query.queryReturnTypeName) struct {
+            type \(goify(query.queryReturnTypeName)) struct {
                 \(returnColumnString.joined(separator: "\n\t"))
             }
             
-            func \(query.queryName)(database *sql.DB, \(argumentsString.joined(separator: ", "))) ([]\(query.queryReturnTypeName), error) {
+            func \(goify(query.queryName))(database *sql.DB, \(argumentsString.joined(separator: ", "))) ([]\(query.queryReturnTypeName), error) {
                 var results []\(query.queryReturnTypeName)
                 rows, err := database.Query("\(query.query)", \(query.arguments.map{ $0.name }.joined(separator: ", ")))
                 if err != nil {
