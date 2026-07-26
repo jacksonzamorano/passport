@@ -250,7 +250,7 @@ public final class PostgreSQL: Sendable, Dialect {
             } else {
                 fValue = "NULL"
             }
-            insertColumnValues.append("\(field.column.sourceName).\(field.column.columnName) == \(fValue)")
+            insertColumnValues.append(fValue)
         }
         insertQueryComponents.append("(\(insertColumnValues.joined(separator: ", ")))")
         if query.projections.isEmpty {

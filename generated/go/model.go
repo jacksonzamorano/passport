@@ -41,7 +41,7 @@ type InsertGetPostWithEmailResult struct {
 
 func InsertGetPostWithEmail(database *sql.DB, text string) ([]InsertGetPostWithEmailResult, error) {
 	var results []InsertGetPostWithEmailResult
-	rows, err := database.Query("WITH result AS (INSERT INTO posts AS posts (text) VALUES (posts.text == $1) RETURNING posts.id AS id, posts.text AS text, posts.userID AS userID, posts.createdDate AS createdDate) SELECT user.email AS userEmail, result.text AS text FROM result AS result INNER JOIN users AS user ON user.id = result.userID", text)
+	rows, err := database.Query("WITH result AS (INSERT INTO posts AS posts (text) VALUES ($1) RETURNING posts.id AS id, posts.text AS text, posts.userID AS userID, posts.createdDate AS createdDate) SELECT user.email AS userEmail, result.text AS text FROM result AS result INNER JOIN users AS user ON user.id = result.userID", text)
 	if err != nil {
 		return results, err
 	}
@@ -138,7 +138,7 @@ type InsertedPayment struct {
 
 func InsertPayment(database *sql.DB, fromUserID uuid.UUID, toUserID uuid.UUID, amount float64) ([]InsertedPayment, error) {
 	var results []InsertedPayment
-	rows, err := database.Query("WITH _Insert AS (INSERT INTO payments AS payments (fromUserID, toUserID, amount) VALUES (payments.fromUserID == $1, payments.toUserID == $2, payments.amount == $3) RETURNING payments.id AS id, payments.fromUserID AS fromUserID, payments.toUserID AS toUserID, payments.amount AS amount, payments.verifiedDate AS verifiedDate) SELECT _Insert.id AS id, _Insert.amount AS amount, _Insert.verifiedDate AS verifiedDate, fromUser.email AS fromUserEmail, toUser.email AS toUserEmail FROM _Insert AS _Insert INNER JOIN users AS fromUser ON fromUser.id = _Insert.fromUserID INNER JOIN users AS toUser ON toUser.id = _Insert.toUserID", fromUserID, toUserID, amount)
+	rows, err := database.Query("WITH _Insert AS (INSERT INTO payments AS payments (fromUserID, toUserID, amount) VALUES ($1, $2, $3) RETURNING payments.id AS id, payments.fromUserID AS fromUserID, payments.toUserID AS toUserID, payments.amount AS amount, payments.verifiedDate AS verifiedDate) SELECT _Insert.id AS id, _Insert.amount AS amount, _Insert.verifiedDate AS verifiedDate, fromUser.email AS fromUserEmail, toUser.email AS toUserEmail FROM _Insert AS _Insert INNER JOIN users AS fromUser ON fromUser.id = _Insert.fromUserID INNER JOIN users AS toUser ON toUser.id = _Insert.toUserID", fromUserID, toUserID, amount)
 	if err != nil {
 		return results, err
 	}

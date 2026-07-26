@@ -101,7 +101,6 @@ struct InsertGetPostWithEmail: Select {
         case text, userEmail
     }
     
-    
     func select(query: SelectQueryBuilder<ReturnType>) {
         let result = query.from(InsertPostQuery(), as: "result")
         let users = query.join(foreign: User.self, as: "user", kind: .inner) { user in
