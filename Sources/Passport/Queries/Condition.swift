@@ -18,27 +18,64 @@ public indirect enum Condition: Sendable {
 public indirect enum QueryValue: Sendable {
     case column(ColumnReference),
          constant(ConditionConstant),
-         argument(ArgumentReference)
+         argument(ArgumentReference),
+         function(QueryFunction)
     
-    func dataType(dialect: Dialect) -> DeclaredType {
+    func dataType(dialect: Dialect) throws(DialectError) -> DeclaredType {
         switch self {
-        case .column(let column): column.typeReference.resolve(dialect: dialect)
+        case .column(let column): try column.typeReference.resolve(dialect: dialect)
         case .constant(let constant): constant.dataType
         case .argument(let argument): .init(dataType: argument.dataType, optional: argument.optional)
+        case .function(let function): try dialect.typeFor(function: function)
+        }
+    }
+    
+    func isType(type t: DataType, in dialect: Dialect, required: Bool = false) throws(DialectError) -> Bool {
+        let dt = try dataType(dialect: dialect)
+        return dt.dataType == t && (!required || !dt.optional)
+    }
+    func isInteger(in dialect: Dialect, required: Bool = false) throws(DialectError) -> Bool {
+        let dt = try dataType(dialect: dialect)
+        return (dt.dataType == .integer32 || dt.dataType == .integer64) && (!required || !dt.optional)
+    }
+    func isFloat(in dialect: Dialect, required: Bool = false) throws(DialectError) -> Bool {
+        let dt = try dataType(dialect: dialect)
+        return (dt.dataType == .float32 || dt.dataType == .float64) && (!required || !dt.optional)
+    }
+    func isNumeric(in dialect: Dialect) throws(DialectError) -> Bool {
+        let dt = try dataType(dialect: dialect)
+        return [.integer32, .integer64, .float32, .float64].contains(dt.dataType)
+    }
+}
+
+public indirect enum QueryFunction: Sendable {
+    case lower(QueryValue),
+         upper(QueryValue),
+         add(QueryValue, QueryValue),
+         subtract(QueryValue, QueryValue),
+         multiply(QueryValue, QueryValue),
+         divide(QueryValue, QueryValue)
+
+    var name: String {
+        switch self {
+        case .lower(_): "lower"
+        case .upper(_): "upper"
+        case .add(_, _): "add"
+        case .subtract(_, _): "subtract"
+        case .multiply(_, _): "multiply"
+        case .divide(_, _): "divide"
         }
     }
 }
 
 public indirect enum ConditionConstant: Sendable {
     case string(String),
-         integer(Int),
-         null
+         integer(Int)
     
     var dataType: DeclaredType {
         switch self {
         case .integer(_): .init(dataType: .integer64, optional: false)
         case .string(_): .init(dataType: .string, optional: false)
-        case .null: .init(dataType: .integer32, optional: true)
         }
     }
 }
@@ -49,6 +86,11 @@ public protocol IntoConditionValue {
 extension QueryValue: IntoConditionValue {
     public func toConditionValue() -> QueryValue { self }
 }
+extension IntoConditionValue {
+    public func isNull() -> Condition { .null(self.toConditionValue()) }
+    public func notNull() -> Condition { .notNull(self.toConditionValue()) }
+}
+
 public func ==(lhs: any IntoConditionValue, rhs: any IntoConditionValue) -> Condition {
     return .equals(lhs.toConditionValue(), rhs.toConditionValue())
 }
@@ -66,11 +108,5 @@ extension String: IntoConditionValue {
 extension Int: IntoConditionValue {
     public func toConditionValue() -> QueryValue {
         .constant(.integer(self))
-    }
-}
-public struct Null: IntoConditionValue {
-    public init() {}
-    public func toConditionValue() -> QueryValue {
-        return .constant(.null)
     }
 }

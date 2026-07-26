@@ -13,6 +13,12 @@ public class InsertQueryBuilder<Return: ProjectionKey>: BaseQuery<Return> {
             value: value.toConditionValue()
         ))
     }
+    public func insertNull(_ column: LocalColumnReference) {
+        self.insertFields.append(.init(
+            column: column.column,
+            value: nil,
+        ))
+    }
     
     public func returning(_ value: any IntoConditionValue, as alias: Return) {
         project(value, as: alias)
@@ -51,7 +57,7 @@ public final class InsertQuery: BaseQueryProperties, @unchecked Sendable {
     
     public struct Field: Sendable {
         let column: ColumnReference
-        let value: QueryValue
+        let value: QueryValue?
     }
 
     public let insertFields: [Field]

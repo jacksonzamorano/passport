@@ -4,10 +4,10 @@ public enum ColumnTypeReference: Sendable {
     case declared(DeclaredType),
          projection(query: Query, columnName: String)
     
-    public func resolve(dialect: any Dialect) -> DeclaredType {
+    public func resolve(dialect: any Dialect) throws(DialectError) -> DeclaredType {
         switch self {
         case .declared(let declared): return declared
-        case .projection(query: let query, columnName: let qn): return query.base[qn].column.dataType(dialect: dialect)
+        case .projection(query: let query, columnName: let qn): return try query.base[qn].column.dataType(dialect: dialect)
         }
     }
 }

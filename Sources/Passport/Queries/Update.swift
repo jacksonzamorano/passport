@@ -5,12 +5,16 @@ public class UpdateQueryBuilder<ReturnType: ProjectionKey>: BaseQuery<ReturnType
     var setFields: [UpdateQuery.Field] = []
     var filters: [Condition] = []
     
-    public func update<T: Table>(_ table: T.Type, as alias: String) -> LocalTableReference<T> {
+    public func update<T: Table>(_ table: T.Type, as alias: String? = nil) -> LocalTableReference<T> {
         return bind(table, as: alias)
     }
 
     public func set(_ column: LocalColumnReference, value: any IntoConditionValue) {
         self.setFields.append(.init(column: column.column, value: value.toConditionValue()))
+    }
+    
+    public func unset(_ column: LocalColumnReference) {
+        self.setFields.append(.init(column: column.column, value: nil))
     }
     
     public func filter(_ build: () -> Condition) {
@@ -49,7 +53,7 @@ public extension Update {
 public class UpdateQuery: BaseQueryProperties, @unchecked Sendable {
     public struct Field {
         var column: ColumnReference
-        var value: QueryValue
+        var value: QueryValue?
     }
     
     public let setFields: [Field]

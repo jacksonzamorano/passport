@@ -102,7 +102,7 @@ public class BaseQuery<ReturnType: ProjectionKey> {
         return bind(.insert(.init(configuration: query)), as: alias)
     }
     
-    func bind<Q: Update>(_ query: Q, as alias: String) -> CTEReference<Q.ReturnType> {
+    func bind<Q: Update>(_ query: Q, as alias: String?) -> CTEReference<Q.ReturnType> {
         return bind(.update(.init(configuration: query)), as: alias)
     }
     

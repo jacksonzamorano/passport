@@ -10,6 +10,8 @@ Schema(dialect: PostgreSQL()) {
     UpdateEmail()
     DeletePost()
     InsertPayment()
+    UnverifyPayment()
+    GetUnverifiedPayments()
     
     Migration {
         CreateTableMigrationStep(User.self)

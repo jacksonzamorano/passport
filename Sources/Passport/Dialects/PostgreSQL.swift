@@ -24,18 +24,82 @@ public final class PostgreSQL: Sendable, Dialect {
         case .right: "RIGHT JOIN"
         }
     }
-    private func conditionValue(_ cv: QueryValue, argumentOffset: Int) -> String {
+    private func conditionValue(_ cv: QueryValue, argumentOffset: Int) throws(DialectError) -> String {
         switch cv {
         case .column(let cr): "\(cr.sourceName).\(cr.columnName)"
         case .constant(let cn):
             switch cn {
             case .integer(let i): "\(i)"
-            case .string(let s): "'\(s)'"
-            case .null: "NULL"
+            case .string(let s): "'\(s.replacingOccurrences(of: "'", with: "\\'"))'"
             }
         case .argument(let arg): "$\(arg.index+1+argumentOffset)"
+        case .function(let fun): try functionDefinition(fun, argumentOffset: argumentOffset)
         }
     }
+    
+    private func arithmeticValue(l: QueryValue, r: QueryValue, argumentOffset: Int, op: (String, String, String) -> String) throws(DialectError) -> String {
+        let lIsNumeric = try l.isNumeric(in: self)
+        let rIsNumeric = try r.isNumeric(in: self)
+        if !lIsNumeric || !rIsNumeric {
+            throw .init(code: .functionArgumentsNotValid, context: "Using arithmetic is invalid with non-numeric columns.")
+        }
+        let (lFloating, rFloating) = (try l.isFloat(in: self), try r.isFloat(in: self))
+        let promotedToReal = lFloating || rFloating
+        let lCV = try conditionValue(l, argumentOffset: argumentOffset)
+        let rCV = try conditionValue(r, argumentOffset: argumentOffset)
+        return op(lCV, rCV, promotedToReal ? "::double precision" : "")
+    }
+    private func arithmeticType(l: QueryValue, r: QueryValue) throws(DialectError) -> DeclaredType {
+        let lDataType = try l.dataType(dialect: self)
+        let rDataType = try r.dataType(dialect: self)
+        let (lFloating, rFloating) = (lDataType.dataType.isFloat, rDataType.dataType.isFloat)
+        let promotedToReal = lFloating || rFloating
+        let dt: DataType = promotedToReal ? .float64 : .integer64
+        return .init(dataType: dt, optional: lDataType.optional || rDataType.optional)
+    }
+    
+    public func typeFor(function fn: QueryFunction) throws(DialectError) -> DeclaredType {
+        switch fn {
+        case .lower(let value):
+            let value = try value.dataType(dialect: self)
+            if value.dataType == .string {
+                return .init(dataType: .string, optional: value.optional)
+            }
+        case .upper(let value):
+            let value = try value.dataType(dialect: self)
+            if value.dataType == .string {
+                return .init(dataType: .string, optional: value.optional)
+            }
+        case .add(let l, let r):
+            return try arithmeticType(l: l, r: r)
+        case .subtract(let l, let r):
+            return try arithmeticType(l: l, r: r)
+        case .multiply(let l, let r):
+            return try arithmeticType(l: l, r: r)
+        case .divide(let l, let r):
+            return try arithmeticType(l: l, r: r)
+        }
+        throw .init(code: .dataTypeNotSupported, context: "")
+    }
+    private func functionDefinition(_ fn: QueryFunction, argumentOffset: Int) throws(DialectError) -> String {
+        switch fn {
+        case .lower(let value): "LOWER(\(try conditionValue(value, argumentOffset: argumentOffset)))"
+        case .upper(let value): "UPPER(\(try conditionValue(value, argumentOffset: argumentOffset)))"
+        case .add(let l, let r): try arithmeticValue(l: l, r: r, argumentOffset: argumentOffset) { l, r, t in
+            "(\(l) + \(r))\(t)"
+        }
+        case .subtract(let l, let r):  try arithmeticValue(l: l, r: r, argumentOffset: argumentOffset) { l, r, t in
+            "(\(l) - \(r))\(t)"
+        }
+        case .multiply(let l, let r):  try arithmeticValue(l: l, r: r, argumentOffset: argumentOffset) { l, r, t in
+            "(\(l) * \(r))\(t)"
+        }
+        case .divide(let l, let r):  try arithmeticValue(l: l, r: r, argumentOffset: argumentOffset) { l, r, t in
+            "(\(l) / \(r))\(t)"
+        }
+        }
+    }
+    
     private func sortDirection(_ dir: SelectQuery.Sort.SortDirection) -> String {
         switch dir {
         case .ascending: "ASC"
@@ -56,9 +120,9 @@ public final class PostgreSQL: Sendable, Dialect {
                 subconditions.append(try conditionToString(condition, argumentOffset: argumentOffset))
             }
             return "(\(subconditions.joined(separator: " OR ")))"
-        case .equals(let a, let b): return "\(conditionValue(a, argumentOffset: argumentOffset)) = \(conditionValue(b, argumentOffset: argumentOffset))"
-        case .null(let a): return "\(conditionValue(a ,argumentOffset: argumentOffset)) IS NULL"
-        case .notNull(let a): return "\(conditionValue(a, argumentOffset: argumentOffset)) IS NOT NULL"
+        case .equals(let a, let b): return "\(try conditionValue(a, argumentOffset: argumentOffset)) = \(try conditionValue(b, argumentOffset: argumentOffset))"
+        case .null(let a): return "\(try conditionValue(a ,argumentOffset: argumentOffset)) IS NULL"
+        case .notNull(let a): return "\(try conditionValue(a, argumentOffset: argumentOffset)) IS NOT NULL"
         }
     }
     private func sourceToString(_ source: SourceOrigin) -> String {
@@ -135,9 +199,11 @@ public final class PostgreSQL: Sendable, Dialect {
     public func buildSelectQuery(query: SelectQuery, context: RenderContext) throws(DialectError) -> String {
         var queryComponents = ["SELECT"]
 
-        queryComponents.append(query.projections.map{
-            "\(self.conditionValue($0.column, argumentOffset: context.argumentCount)) AS \($0.alias)"
-        }.joined(separator: ", "))
+        var projectionString: [String] = []
+        for projection in query.projections {
+            projectionString.append("\(try conditionValue(projection.column, argumentOffset: context.argumentCount)) AS \(projection.alias)")
+        }
+        queryComponents.append(projectionString.joined(separator: ", "))
         
         queryComponents.append("FROM \(query.target!.realName) AS \(query.target!.alias)")
         
@@ -160,10 +226,10 @@ public final class PostgreSQL: Sendable, Dialect {
         }
         
         if let limit = query.limit {
-            queryComponents.append("LIMIT \(conditionValue(limit, argumentOffset: context.argumentCount))")
+            queryComponents.append("LIMIT \(try conditionValue(limit, argumentOffset: context.argumentCount))")
         }
         if let offset = query.offset {
-            queryComponents.append("OFFSET \(conditionValue(offset, argumentOffset: context.argumentCount))")
+            queryComponents.append("OFFSET \(try conditionValue(offset, argumentOffset: context.argumentCount))")
         }
         
         return queryComponents.joined(separator: " ")
@@ -175,15 +241,28 @@ public final class PostgreSQL: Sendable, Dialect {
             "\($0.column.columnName)"
         }.joined(separator: ", ")
         insertQueryComponents.append("(\(insertColumnNames)) VALUES")
-        let insertColumnValues = query.insertFields.map {
-            conditionValue($0.value, argumentOffset: context.argumentCount)
-        }.joined(separator: ", ")
-        insertQueryComponents.append("(\(insertColumnValues))")
+        
+        var insertColumnValues: [String] = []
+        for field in query.insertFields {
+            let fValue: String
+            if let fieldValue = field.value {
+                fValue = try conditionValue(fieldValue, argumentOffset: context.argumentCount)
+            } else {
+                fValue = "NULL"
+            }
+            insertColumnValues.append("\(field.column.sourceName).\(field.column.columnName) == \(fValue)")
+        }
+        insertQueryComponents.append("(\(insertColumnValues.joined(separator: ", ")))")
         if query.projections.isEmpty {
             return insertQueryComponents.joined(separator: " ")
         }
         
-        insertQueryComponents.append("RETURNING \(query.projections.map{ "\(conditionValue($0.column, argumentOffset: context.argumentCount)) AS \($0.alias)" }.joined(separator: ", "))")
+        var projections: [String] = []
+        for projection in query.projections {
+            projections.append("\(try conditionValue(projection.column, argumentOffset: context.argumentCount)) AS \(projection.alias)")
+        }
+        
+        insertQueryComponents.append("RETURNING \(projections.joined(separator: ", "))")
         return insertQueryComponents.joined(separator: " ")
     }
     
@@ -193,7 +272,13 @@ public final class PostgreSQL: Sendable, Dialect {
             queryComponents.append("SET")
             var sets = [String]()
             for field in query.setFields {
-                sets.append("\(field.column.columnName) = \(conditionValue(field.value, argumentOffset: context.argumentCount))")
+                let fValue: String
+                if let fieldValue = field.value {
+                    fValue = try conditionValue(fieldValue, argumentOffset: context.argumentCount)
+                } else {
+                    fValue = "NULL"
+                }
+                sets.append("\(field.column.columnName) = \(fValue)")
             }
             queryComponents.append(sets.joined(separator: ", "))
         }
@@ -206,8 +291,10 @@ public final class PostgreSQL: Sendable, Dialect {
             return queryComponents.joined(separator: " ")
         }
         
-        let projectionsString = query.projections
-            .map{ "\(conditionValue($0.column, argumentOffset: context.argumentCount)) AS \($0.alias)" }
+        var projectionsString: [String] = []
+        for projection in query.projections {
+            projectionsString.append("\(try conditionValue(projection.column, argumentOffset: context.argumentCount)) AS \(projection.alias)")
+        }
         queryComponents.append("RETURNING \(projectionsString.joined(separator: ", "))")
         
         return queryComponents.joined(separator: " ")
@@ -224,8 +311,10 @@ public final class PostgreSQL: Sendable, Dialect {
             return queryComponents.joined(separator: " ")
         }
         
-        let projectionsString = query.projections
-            .map{ "\(conditionValue($0.column, argumentOffset: context.argumentCount)) AS \($0.alias)" }
+        var projectionsString: [String] = []
+        for projection in query.projections {
+            projectionsString.append("\(try conditionValue(projection.column, argumentOffset: context.argumentCount)) AS \(projection.alias)")
+        }
         queryComponents.append("RETURNING \(projectionsString.joined(separator: ", "))")
         
         return queryComponents.joined(separator: " ")

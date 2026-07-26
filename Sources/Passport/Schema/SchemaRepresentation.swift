@@ -56,7 +56,7 @@ internal class SchemaRepresentation {
                     queryReturnTypeName: query.base.identity.queryReturnTypeName,
                     query: queryString,
                     arguments: context.arguments,
-                    returnColumns: BuiltQuery.getReturnShape(query: query, dialect: dialect)
+                    returnColumns: try BuiltQuery.getReturnShape(query: query, dialect: dialect)
                 )
                 
                 builtQueries.append(builtQuery)

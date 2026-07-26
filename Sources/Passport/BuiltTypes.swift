@@ -12,7 +12,7 @@ public struct BuiltQuery: Sendable {
         public let fullDataType: DeclaredType
     }
     
-    static func getReturnShape(query: Query, dialect: any Dialect) -> [ReturnedProperty] {
+    static func getReturnShape(query: Query, dialect: any Dialect) throws(DialectError) -> [ReturnedProperty] {
         var resolvedJoins = ReturnPrescense()
         switch query {
         case .select(let select):
@@ -21,12 +21,16 @@ public struct BuiltQuery: Sendable {
             }
         default: break
         }
-        return query.base.projections.map {
-            ReturnedProperty(
-                name: $0.alias,
-                fullDataType: $0.column.dataType(dialect: dialect)
-            )
+        
+        var returnedProperties: [ReturnedProperty] = []
+        for projection in query.base.projections {
+            returnedProperties.append(.init(
+                name: projection.alias,
+                fullDataType: try projection.column.dataType(dialect: dialect)
+            ))
         }
+        
+        return returnedProperties
     }
 }
 

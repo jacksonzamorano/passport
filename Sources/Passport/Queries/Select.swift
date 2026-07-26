@@ -12,8 +12,11 @@ public class SelectQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> 
     public func from<T: Table>(_ table: T.Type, as alias: String? = nil) -> LocalTableReference<T> {
         return bind(table, as: alias)
     }
-    public func from<Query: Insert>(_ insert: Query, as alias: String? = nil) -> CTEReference<Query.ReturnType> {
-        return bind(insert, as: alias)
+    public func from<Query: Insert>(_ query: Query, as alias: String? = nil) -> CTEReference<Query.ReturnType> {
+        return bind(query, as: alias)
+    }
+    public func from<Query: Update>(_ query: Query, as alias: String? = nil) -> CTEReference<Query.ReturnType> {
+        return bind(query, as: alias)
     }
     
     public func filter(_ build: () -> Condition) {

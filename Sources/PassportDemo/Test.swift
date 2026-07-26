@@ -37,7 +37,7 @@ struct Post: Table {
 struct Payment: Table {
     
     enum Key: String, TableKey {
-        case id, fromUserID, toUserID, amount
+        case id, fromUserID, toUserID, amount, verifiedDate
     }
     
     static let tableName: String = "payments"
@@ -48,6 +48,7 @@ struct Payment: Table {
         case .fromUserID: .uuid().required().foreignKey(User.self, column: .id)
         case .toUserID: .uuid().required().foreignKey(User.self, column: .id)
         case .amount: .float64().required()
+        case .verifiedDate: .timezonedDate().nullable()
         }
     }
 }
@@ -139,7 +140,7 @@ struct DeletePost: Delete {
 }
 
 enum FullPayment: String, ProjectionKey {
-    case id, fromUserEmail, toUserEmail, amount
+    case id, fromUserEmail, toUserEmail, amount, verifiedDate
 }
 
 
@@ -176,7 +177,50 @@ struct InsertPayment: Select {
         query.resultTypeName("InsertedPayment")
         query.select(insert[.id], as: .id)
         query.select(insert[.amount], as: .amount)
+        query.select(insert[.verifiedDate], as: .verifiedDate)
         query.select(fromUser[.email], as: .fromUserEmail)
         query.select(toUser[.email], as: .toUserEmail)
+    }
+}
+
+struct UnverifyPayment: Select {
+    struct Modification: Update {
+        func update(query: UpdateQueryBuilder<Payment.Key>) {
+            let paymentID = query.argument("paymentID", dataType: .uuid)
+            let payment = query.update(Payment.self)
+            query.filter {
+                paymentID == payment[.id]
+            }
+            query.unset(payment[.verifiedDate])
+            query.returnAll(from: payment)
+        }
+    }
+    
+    func select(query: SelectQueryBuilder<FullPayment>) {
+        let result = query.from(Modification())
+        
+        let fromUser = query.join(foreign: User.self, as: "fromUser", kind: .inner) { fromUser in
+            fromUser[.id] == result[.fromUserID]
+        }
+        let toUser = query.join(foreign: User.self, as: "toUser", kind: .inner) { toUser in
+            toUser[.id] == result[.toUserID]
+        }
+        
+        query.select(result[.id], as: .id)
+        query.select(result[.amount], as: .amount)
+        query.select(result[.verifiedDate], as: .verifiedDate)
+        query.select(fromUser[.email], as: .fromUserEmail)
+        query.select(toUser[.email], as: .toUserEmail)
+        query.resultTypeName("UnverifiedPayment")
+    }
+}
+
+struct GetUnverifiedPayments: Select {
+    func select(query: SelectQueryBuilder<Payment.Key>) {
+        let result = query.from(Payment.self)
+        query.filter {
+            result[.verifiedDate].isNull()
+        }
+        query.selectAll(from: result)
     }
 }

@@ -20,6 +20,25 @@ public enum DataType: Sendable {
          uuid,
          date,
          dateWithTimezone
+    
+    var isNumeric: Bool {
+        switch self {
+        case .integer32, .integer64, .float32, .float64: true
+        default: false
+        }
+    }
+    var isFloat: Bool {
+        switch self {
+        case .float32, .float64: true
+        default: false
+        }
+    }
+    var isInteger: Bool {
+        switch self {
+        case .integer32, .integer64: true
+        default: false
+        }
+    }
 }
 
 public struct DeclaredType: Sendable {
