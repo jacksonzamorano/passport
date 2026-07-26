@@ -17,10 +17,12 @@ public struct LocalColumnReference: Sendable, IntoConditionValue {
 public struct TableReference<T: Table> {
     let alias: String
     let table: T.Type
+    let joinID: UUID
     
-    init(_ source: TableSource) {
+    init(_ source: TableSource, joinID: UUID) {
         self.alias = source.alias
         self.table = T.self
+        self.joinID = joinID
     }
     
     public subscript(_ key: T.Key) -> ColumnReference {
@@ -28,7 +30,8 @@ public struct TableReference<T: Table> {
         return ColumnReference(
             sourceName: alias,
             columnName: key.rawValue,
-            typeReference: .declared(.init(dataType: column.dataType, optional: column.nullability.optional))
+            typeReference: .declared(.init(dataType: column.dataType, optional: column.nullability.optional)),
+            origin: .join(joinID)
         )
     }
 }
@@ -48,7 +51,8 @@ public struct LocalTableReference<T: Table> {
             column: ColumnReference(
                 sourceName: alias,
                 columnName: key.rawValue,
-                typeReference: .declared(.init(dataType: column.dataType, optional: column.nullability.optional))
+                typeReference: .declared(.init(dataType: column.dataType, optional: column.nullability.optional)),
+                origin: .local,
             )
         )
     }

@@ -24,9 +24,17 @@ public struct BuiltQuery: Sendable {
         
         var returnedProperties: [ReturnedProperty] = []
         for projection in query.base.projections {
+            var fullDataType = try projection.column.dataType(dialect: dialect)
+            if case .column(let column) = projection.column,
+               case .join(let joinID) = column.origin {
+                if resolvedJoins.isOptional(joinID: joinID) {
+                    fullDataType.optional = true
+                }
+            }
+ 
             returnedProperties.append(.init(
                 name: projection.alias,
-                fullDataType: try projection.column.dataType(dialect: dialect)
+                fullDataType: fullDataType,
             ))
         }
         
@@ -63,8 +71,8 @@ struct ReturnPrescense {
         joins.append(.init(joinID: join.id, optional: selfOptional))
     }
     
-    func isOptional(joinID: UUID) -> Bool {
-        joins.first(where: { $0.joinID == joinID })?.optional ?? false
+    func isOptional(joinID: UUID?) -> Bool {
+        joins.first(where: { $0.joinID == joinID })!.optional
     }
 }
 

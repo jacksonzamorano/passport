@@ -4,6 +4,36 @@ import "database/sql"
 import "github.com/google/uuid"
 import "time"
 
+type SelectUserProfileQueryResult struct {
+	UserEmail string  `json:"userEmail"`
+	Username  *string `json:"username"`
+}
+
+func SelectUserProfileQuery(database *sql.DB) ([]SelectUserProfileQueryResult, error) {
+	var results []SelectUserProfileQueryResult
+	rows, err := database.Query("SELECT users.email AS userEmail, profiles.username AS username FROM users AS users LEFT JOIN user_profiles AS profiles ON profiles.userID = users.id")
+	if err != nil {
+		return results, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var result SelectUserProfileQueryResult
+		err = rows.Scan(&result.UserEmail, &result.Username)
+		if err != nil {
+			return results, err
+		}
+		results = append(results, result)
+	}
+
+	if err := rows.Err(); err != nil {
+		return results, err
+	}
+
+	return results, nil
+}
+
 type SelectPostsQueryResult struct {
 	Text      *string `json:"text"`
 	UserEmail string  `json:"userEmail"`

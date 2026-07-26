@@ -12,10 +12,15 @@ public enum ColumnTypeReference: Sendable {
     }
 }
 
+public enum ColumnOrigin: Sendable {
+    case local, join(UUID)
+}
+
 public struct ColumnReference: Sendable, IntoConditionValue {
     public let sourceName: String
     public let columnName: String
     public let typeReference: ColumnTypeReference
+    public let origin: ColumnOrigin
     
     public func toConditionValue() -> QueryValue {
         .column(self)

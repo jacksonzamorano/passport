@@ -109,7 +109,7 @@ public class BaseQuery<ReturnType: ProjectionKey> {
     func bind<Keys: ProjectionKey>(_ query: Query, as alias: String?) -> CTEReference<Keys> {
         let source = addSource(query, name: alias ?? query.name)
         target(.cte(source))
-        return .init(source, alias: alias ?? query.name)
+        return .init(source, alias: alias ?? query.name, columnOrigin: .local)
     }
 
     public func argument(_ name: String, dataType: DataType, optional: Bool = false) -> ArgumentReference {

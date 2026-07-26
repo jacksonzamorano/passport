@@ -2,9 +2,11 @@ import Passport
 
 Schema(dialect: PostgreSQL()) {
     User()
+    UserProfile()
     Post()
     Payment()
     
+    SelectUserProfileQuery()
     SelectPostsQuery()
     InsertGetPostWithEmail()
     UpdateEmail()

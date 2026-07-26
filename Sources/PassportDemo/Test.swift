@@ -17,6 +17,22 @@ struct User: Table {
     }
 }
 
+struct UserProfile: Table {
+    public enum Key: String, TableKey {
+        case id, userID, username
+    }
+    
+    static public let tableName: String = "user_profiles"
+    
+    static func column(_ key: Key) -> Column {
+        switch key {
+        case .id: .uuid().required()
+        case .userID: .uuid().required().foreignKey(User.self, column: .id)
+        case .username: .string().required()
+        }
+    }
+}
+
 struct Post: Table {
     enum Key: String, TableKey, ProjectionKey {
         case id, text, userID, createdDate
@@ -50,6 +66,25 @@ struct Payment: Table {
         case .amount: .float64().required()
         case .verifiedDate: .timezonedDate().nullable()
         }
+    }
+}
+
+struct SelectUserProfileQuery: Select {
+    enum Projection: String, ProjectionKey {
+        case userEmail, username
+    }
+    func select(query: SelectQueryBuilder<Projection>) {
+        let users = query.from(User.self)
+        let profiles = query.join(
+            foreign: UserProfile.self,
+            as: "profiles",
+            kind: .left
+        ) { profiles in
+            profiles[.userID] == users[.id]
+        }
+        
+        query.select(users[.email], as: .userEmail)
+        query.select(profiles[.username], as: .username)
     }
 }
 
@@ -160,8 +195,6 @@ struct InsertPayment: Select {
             query.returnAll(into)
         }
     }
-    
-    typealias ReturnType = FullPayment
     
     func select(query: SelectQueryBuilder<FullPayment>) {
         let insert = query.from(_Insert())

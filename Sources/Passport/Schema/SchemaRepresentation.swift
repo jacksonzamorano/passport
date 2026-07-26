@@ -61,8 +61,7 @@ internal class SchemaRepresentation {
                 
                 builtQueries.append(builtQuery)
             } catch {
-                errors.errors.append(
-                    .init(error: error, location: query.base.identity.queryName)
+                errors.errors.append(.init(error: error, location: query.base.identity.queryName)
                 )
             }
         }

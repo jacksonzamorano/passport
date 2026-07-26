@@ -41,10 +41,12 @@ public class SelectQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> 
     public func join<T: Table>(foreign: T.Type, as alias: String, kind: Join.Kind, _ build: (TableReference<T>) -> Condition) -> TableReference<T> {
         let source = TableSource(alias: alias, table: foreign)
         
-        let reference = TableReference<T>(source)
+        let joinID = UUID()
+        let reference = TableReference<T>(source, joinID: joinID)
         let condition = build(reference)
         joins.append(
             Join(
+                id: joinID,
                 kind: kind,
                 alias: alias,
                 source: .table(source),
@@ -61,10 +63,12 @@ public class SelectQueryBuilder<Returning: ProjectionKey>: BaseQuery<Returning> 
         kind: Join.Kind,
         _ build: (CTEReference<K>) -> Condition
     ) -> CTEReference<K> {
-        let reference = CTEReference<K>(cte.source, alias: alias)
+        let joinID = UUID()
+        let reference = CTEReference<K>(cte.source, alias: alias, columnOrigin: .join(joinID))
         let condition = build(reference)
         joins.append(
             Join(
+                id: joinID,
                 kind: kind,
                 alias: alias,
                 source: .cte(cte.source),
