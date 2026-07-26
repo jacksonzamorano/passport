@@ -1,625 +1,550 @@
 # Passport
 
-**Full-stack across your stack.**
+Passport is a Swift library for defining database tables, type-safe SQL queries, and migrations in one place, then compiling them into dialect-specific SQL and generated client code.
 
-Passport is a Swift-based schema definition and code generation tool that keeps your backend and frontend in sync. Define your data models, database tables, queries, and API routes once in Swift, then generate type-safe code and SQL for multiple languages.
+You declare tables and queries as Swift types. Passport validates them, builds PostgreSQL SQL (including CTEs for nested queries), and can emit typed Go helpers via `GoSQLAdapter`.
 
-## What is Passport?
+## Status / WIP
 
-Passport lets you define your application's data layer in a single source of truth using Swift macros. It then generates:
+Passport is early and actively evolving. Query definition, PostgreSQL SQL compilation, and nested CTE queries are the most usable parts today. Several areas exist in the API but are incomplete:
 
-- **SQL schemas** for your database (PostgreSQL support included)
-- **Type-safe code** in Go, TypeScript, and Swift
-- **Query builders** for common database operations (SELECT, INSERT, UPDATE, DELETE)
-- **Type-safe query arguments** with compile-time validation
-- **API route definitions** for consistent endpoints across your stack
+| Area | Status |
+| --- | --- |
+| **Migrations** | **WIP.** You can declare `Migration` steps (`CreateTableMigrationStep`, `CreateColumnMigrationStep`) and Passport compiles them to SQL internally, but the `Schema` entrypoint does not write migration output — adapters only receive built queries. Step kinds are limited to create-table and add-column. Column defaults (`DefaultValue`) are stubbed on `Column` and not emitted in SQL yet. |
+| **Adapters / codegen** | **WIP.** Only `GoSQLAdapter` ships. It generates Go `database/sql` helpers for queries (result structs + functions), not table models or migration files. Other languages are not implemented. |
+| **Dialects** | **WIP beyond Postgres.** `PostgreSQL` is the only dialect. The `Dialect` protocol is the extension point for more. |
+| **Query predicates & expressions** | **Partial.** Filters support `==`, null checks, and `Condition.all` / `Condition.one`. SQL functions (`lower` / `upper` / arithmetic) exist in the dialect layer (`QueryFunction`) without ergonomic builder helpers yet. Broader operators (`>`, `LIKE`, `IN`, etc.) are not there. |
+| **Column types** | **Partial.** Common builders (`.string()`, `.uuid()`, numbers, dates) are ready. `.blob` is supported by the Postgres dialect and Go adapter, but there is no `Column.blob()` helper yet. |
+| **Tests & tooling** | **WIP.** There is no package test target yet. CLI flags on `Schema` are commented out / unused. |
 
-## Why Passport?
+What works well right now: defining tables and queries in Swift, joins, nested insert/update-as-CTE selects, argument typing, return-shape inference (including join optionality), and generating Go query wrappers via `GoSQLAdapter`. See [`Sources/PassportDemo`](Sources/PassportDemo).
 
-**Problem**: In traditional full-stack development, you maintain separate type definitions for:
-- Database schemas (SQL DDL)
-- Backend models (Go structs, TypeScript interfaces, etc.)
-- Frontend types (TypeScript interfaces)
-- API request/response types
-
-When your data model changes, you must update all of these manually, leading to inconsistencies and runtime errors.
-
-**Solution**: Passport provides a single source of truth. Define your schema once in Swift, and automatically generate:
-- Database migration scripts
-- Type-safe models in multiple languages
-- Query definitions with parameter validation
-- Consistent types across your entire stack
-
-## Quick Start
-
-### 1. Define Your Schema
-
-Define a database table with queries:
-
-```swift
-@Record(type: .table("users"))
-struct User {
-    let id = DEFAULT_ID_FIELD
-    let name = Field(.string)
-    let archived = Field(.bool)
-    let status = Field(.value(UserStatus.self))
-
-    // SELECT query with arguments
-    static let selectById = select(with: SelectByIdArgs.self) { query in
-        query.filter("\(\User.id) = \(\.userId)")
-        query.filter("\(\User.archived) = false")
-        query.one()
-    }
-
-    // SELECT query returning multiple results
-    static let selectAll = select(with: NoArguments.self) { query in
-        query.filter("\(\User.status) = \(UserStatus.active)")
-        query.many()
-    }
-
-    // INSERT query
-    static let insertUser = insert(\.name, \.archived)
-
-    // UPDATE query
-    static let updateName = update(with: UpdateNameArgs.self) { query in
-        query.set("\(\User.name) = \(\UpdateNameArgs.name)")
-        query.filter("\(\User.id) = \(\.userId)")
-        query.one()
-    }
-
-    @Argument
-    struct SelectByIdArgs {
-        let userId: DataType = .int64
-    }
-
-    @Argument
-    struct UpdateNameArgs {
-        let userId: DataType = .int64
-        let name: DataType = .string
-    }
-
-    @Argument
-    struct NoArguments { }
-}
-
-@Enum
-enum UserStatus: String {
-    case inactive, active, removedByAdmin
-}
-```
-
-Define request/response models:
-
-```swift
-@Model
-struct GetUserRequest {
-    var userId = Field(.int64)
-}
-
-@Model
-struct UserCreateDto {
-    var name = Field(.string)
-}
-```
-
-Define API routes:
-
-```swift
-func userRoutes() -> RouteGroup {
-    return RouteGroup(root: "/users") {
-        Route("getUsers", path: "/")
-        Route("createUser", path: "/create", method: .post)
-    }
-}
-```
-
-### 2. Build and Export
-
-Build your schema and export to multiple languages:
-
-```swift
-@main
-struct SchemaBuilder {
-    static func main() {
-        let postgres = SQLBuilder(Postgres())
-
-        let schema = Schema("MyApp") {
-            User.self
-            UserStatus.self
-            GetUserRequest.self
-            UserCreateDto.self
-        } routes: {
-            userRoutes()
-        }
-        .output(Go(sqlBuilder: postgres)) {
-            CodeBuilderConfiguration(
-                root: URL(filePath: "./generated/go"),
-                generateRecords: .asRecords,
-                generateRoutes: true
-            )
-        }
-        .output(TypeScript(buildIndex: true)) {
-            CodeBuilderConfiguration(
-                root: URL(filePath: "./generated/typescript"),
-                generateRoutes: true
-            )
-        }
-        .output(Swift(targetedPlatform: .bits64, standardizePropertyNames: true)) {
-            CodeBuilderConfiguration(
-                root: URL(filePath: "./generated/swift"),
-                generateRoutes: true
-            )
-        }
-
-        try! schema.build()
-    }
-}
-```
-
-### 3. Run the Schema Builder
-
-Execute your schema builder to generate all code:
-
-```bash
-swift run YourSchemaTarget
-```
-
-This will generate:
-- **PostgreSQL schema** (tables, queries, types)
-- **Go structs and functions** for models, records, and routes
-- **TypeScript interfaces and types** for models, records, and routes
-- **Swift types** for models, records, and routes
-
-## Key Features
-
-- **Single Source of Truth**: Define your schema once in Swift
-- **Multi-Language Support**: Generate code for Go, TypeScript, and Swift
-- **SQL Generation**: Create database schemas from your record definitions
-- **Type Safety**: Compile-time validation of your data structures
-- **Query Builder**: Define and generate type-safe database queries
-- **Route Generation**: Define API routes that generate consistently across languages
-- **Swift Macros**: Clean, declarative syntax using `@Model`, `@Record`, `@Enum`, and `@Argument`
-
-## Core Concepts
-
-### 1. Models
-
-Models are simple data transfer objects (DTOs) used for API requests/responses. Use the `@Model` macro:
-
-```swift
-@Model
-struct CreateUserRequest {
-    var email = Field(.string)
-    var name = Field(.string)
-    var role = Field(.value(UserRole.self))
-}
-```
-
-### 2. Records
-
-Records represent database tables or views. Use the `@Record` macro and define queries:
-
-```swift
-@Record(type: .table("users"))
-struct User {
-    let id = DEFAULT_ID_FIELD  // Pre-configured primary key
-    let email = Field(.string)
-    let name = Field(.string)
-    let role = Field(.value(UserRole.self))
-    let createdAt = Field(.datetime)
-
-    // Define queries with type-safe arguments
-    static let selectByEmail = select(with: SelectByEmailArgs.self) { query in
-        query.filter("\(\User.email) = \(\.email)")
-        query.one()
-    }
-
-    static let selectAll = select(with: NoArguments.self) { query in
-        query.many()
-    }
-
-    @Argument
-    struct SelectByEmailArgs {
-        let email: DataType = .string
-    }
-
-    @Argument
-    struct NoArguments { }
-}
-```
-
-### 3. Enums
-
-Enums provide type-safe enumeration values for both database and generated code:
-
-```swift
-@Enum
-enum UserRole: String {
-    case admin
-    case user
-    case guest
-}
-```
-
-### 4. Fields
-
-Fields define the properties of models and records with type information:
-
-```swift
-// Simple field
-var name = Field(.string)
-
-// Optional field
-var bio = Field(.optional(.string))
-
-// Array field
-var tags = Field(.array(.string))
-
-// Enum field
-var status = Field(.value(UserStatus.self))
-
-// Model reference field
-var user = Field(.model(User.self))
-
-// Common field types
-var id = Field(.int64)
-var count = Field(.int32)
-var price = Field(.double)
-var isActive = Field(.bool)
-var createdAt = Field(.datetime)
-var uuid = Field(.uuid)
-var data = Field(.bytes)
-```
-
-### 5. Queries
-
-Define type-safe database queries using the query builder DSL:
-
-```swift
-// SELECT query returning a single result
-static let selectById = select(with: SelectByIdArgs.self) { query in
-    query.filter("\(\User.id) = \(\.userId)")
-    query.filter("\(\User.archived) = false")
-    query.one()
-}
-
-// SELECT query returning multiple results
-static let selectActive = select(with: NoArguments.self) { query in
-    query.filter("\(\User.archived) = false")
-    query.many()
-}
-
-// INSERT query - specify which fields to insert
-static let insertUser = insert(\.email, \.name, \.role)
-
-// UPDATE query with filters
-static let updateName = update(with: UpdateNameArgs.self) { query in
-    query.set("\(\User.name) = \(\UpdateNameArgs.name)")
-    query.filter("\(\User.id) = \(\.userId)")
-    query.one()
-}
-
-// DELETE query
-static let deleteUser = delete(with: DeleteUserArgs.self) { query in
-    query.filter("\(\User.id) = \(\.userId)")
-}
-```
-
-### 6. Routes
-
-Define API routes that will be generated consistently across all target languages:
-
-```swift
-// Define a route group with a common prefix
-func userRoutes() -> RouteGroup {
-    return RouteGroup(root: "/users") {
-        Route("getUsers", path: "/", method: .get)
-        Route("getUserById", path: "/:id", method: .get)
-        Route("createUser", path: "/create", method: .post)
-        Route("updateUser", path: "/:id", method: .patch)
-        Route("deleteUser", path: "/:id", method: .delete)
-    }
-}
-
-// Nest route groups
-func apiRoutes() -> RouteGroup {
-    return RouteGroup(root: "/api/v1") {
-        userRoutes()
-        postRoutes()
-        commentRoutes()
-    }
-}
-
-// Add routes to your schema
-let schema = Schema("MyApp") {
-    // ... models and records
-} routes: {
-    apiRoutes()
-}
-```
-
-Route methods available:
-- `.get` - GET requests
-- `.post` - POST requests
-- `.patch` - PATCH requests
-- `.put` - PUT requests
-- `.delete` - DELETE requests
-
-## Advanced Features
-
-### Language-Specific Configuration
-
-Customize code generation for each target language:
-
-```swift
-// Go configuration
-let goConfig = GoConfiguration { cfg in
-    cfg.packageName = "myapp"
-}
-
-schema.output(Go(sqlBuilder: postgres, config: goConfig)) {
-    CodeBuilderConfiguration(
-        root: URL(filePath: "./generated/go"),
-        generateRecords: .asRecords,  // or .asInterfaces
-        generateRoutes: true
-    )
-}
-
-// TypeScript configuration
-schema.output(TypeScript(buildIndex: true)) {
-    CodeBuilderConfiguration(
-        root: URL(filePath: "./generated/typescript"),
-        generateRoutes: true
-    )
-}
-
-// Swift configuration
-schema.output(Swift(targetedPlatform: .bits64, standardizePropertyNames: true)) {
-    CodeBuilderConfiguration(
-        root: URL(filePath: "./generated/swift"),
-        generateRoutes: true
-    )
-}
-```
-
-### Custom SQL Dialects
-
-Implement custom SQL dialects for other databases by conforming to the `Dialect` protocol:
-
-```swift
-class MySQL: Dialect {
-    var terminator: String = ";"
-
-    func convertType(_ type: DataType) throws -> String {
-        switch type {
-        case .int64:
-            return "BIGINT"
-        case .string:
-            return "VARCHAR(255)"
-        // ... implement other types
-        default:
-            throw SQLError.typeNotSupported(type)
-        }
-    }
-
-    // Implement other required methods...
-}
-
-// Use in schema
-let mysql = SQLBuilder(MySQL())
-schema.output(Go(sqlBuilder: mysql)) { config }
-```
-
-### Custom Language Generators
-
-Extend Passport to generate code for additional languages by conforming to the `Language` protocol:
-
-```swift
-struct Python: Language {
-    func comment(for comment: String) -> String {
-        return "# \(comment)"
-    }
-
-    func convert(type: DataType, inFile file: File) throws -> String {
-        switch type {
-        case .int64:
-            return "int"
-        case .string:
-            return "str"
-        case .bool:
-            return "bool"
-        // ... implement other types
-        default:
-            throw LanguageError.typeNotSupported(type)
-        }
-    }
-
-    // Implement other required methods...
-}
-```
-
-## Project Structure
-
-When using Passport, a typical project structure might look like:
-
-```
-MyProject/
-├── Package.swift
-├── Sources/
-│   ├── Schema/           # Your schema definitions
-│   │   ├── Models/
-│   │   │   ├── User.swift
-│   │   │   └── Post.swift
-│   │   ├── Enums/
-│   │   │   └── UserRole.swift
-│   │   └── Main.swift    # Schema build script
-│   └── Generated/        # Output directory (gitignored)
-│       ├── go/
-│       ├── typescript/
-│       └── swift/
-├── database/
-│   └── schema.sql        # Generated SQL
-```
-
-## API Reference
-
-### Core Types
-
-- **`Field`**: Represents a field/property in a model or record
-- **`DataType`**: The type system (int32, int64, string, double, bool, datetime, uuid, bytes, array, optional, model, value)
-- **`Schema`**: Groups models, records, enums, and routes for code generation
-- **`Route`**: Represents an API endpoint with a path and HTTP method
-- **`RouteGroup`**: Groups routes under a common path prefix
-
-### Macros
-
-- **`@Model`**: Marks a struct as a data transfer object (DTO)
-- **`@Record(type:)`**: Marks a struct as a database record (table or view)
-- **`@Enum`**: Marks an enum for inclusion in the schema
-- **`@Argument`**: Marks a struct as type-safe query arguments
-
-### Query Builders
-
-- **`select(with:)`**: Builds SELECT queries with filters and result cardinality
-- **`insert(...)`**: Builds INSERT queries for specified fields
-- **`update(with:)`**: Builds UPDATE queries with SET and WHERE clauses
-- **`delete(with:)`**: Builds DELETE queries with WHERE clauses
-
-### Builders
-
-- **`SQLBuilder`**: Generates SQL DDL and queries from a dialect
-- **`CodeBuilder`**: Orchestrates code generation for a language
-- **`CodeBuilderConfiguration`**: Configures output paths and generation options
-
-### Languages
-
-- **`Go(sqlBuilder:config:)`**: Go code generator with optional configuration
-- **`TypeScript(buildIndex:)`**: TypeScript code generator with optional index file generation
-- **`Swift(targetedPlatform:standardizePropertyNames:)`**: Swift code generator with platform targeting
-
-### Dialects
-
-- **`Postgres`**: PostgreSQL SQL dialect implementation
-
-### Route Methods
-
-- **`RouteMethod.get`**: HTTP GET
-- **`RouteMethod.post`**: HTTP POST
-- **`RouteMethod.patch`**: HTTP PATCH
-- **`RouteMethod.put`**: HTTP PUT
-- **`RouteMethod.delete`**: HTTP DELETE
-
-## Documentation
-
-For detailed API documentation, see the DocC documentation included in this package. Build the documentation with:
-
-```bash
-swift package generate-documentation
-```
-
-## Installation
-
-### Requirements
+## Requirements
 
 - Swift 6.2+
 - macOS 14+
 
-### Add to Your Project
+## Installation
 
-Add Passport to your Swift package dependencies in `Package.swift`:
+Add Passport to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/yourusername/passport.git", from: "1.0.0")
+    .package(url: "https://github.com/jacksonzamorano/passport.git", branch: "master")
 ]
 ```
 
-Then add it as a dependency to your target:
+Then depend on the `Passport` product:
 
 ```swift
-targets: [
-    .executableTarget(
-        name: "MySchemaBuilder",
-        dependencies: ["Passport"]
-    )
-]
+.target(
+    name: "MySchema",
+    dependencies: [
+        .product(name: "Passport", package: "passport")
+    ]
+)
 ```
 
-### Create a Schema Builder
+## Quick start
 
-Create a new executable target in your project for building your schema:
+Define a table, a query, and a schema entrypoint that writes Go code:
 
 ```swift
-// Sources/MySchemaBuilder/Main.swift
 import Passport
-import Foundation
 
-@main
-struct MySchemaBuilder {
-    static func main() {
-        // Define your schema here (see Quick Start above)
-        let schema = Schema("MyApp") {
-            // Your models and records
-        } routes: {
-            // Your routes
+struct User: Table {
+    enum Key: String, TableKey {
+        case id, email
+    }
+
+    static let tableName = "users"
+
+    static func column(_ key: Key) -> Column {
+        switch key {
+        case .id: .uuid().required()
+        case .email: .string().required()
+        }
+    }
+}
+
+struct SelectUserByEmail: Select {
+    enum ReturnType: String, ProjectionKey {
+        case id, email
+    }
+
+    func select(query: SelectQueryBuilder<ReturnType>) {
+        let users = query.from(User.self)
+        let email = query.argument("email", dataType: .string)
+
+        query.filter {
+            users[.email] == email
         }
 
-        try! schema.build()
+        query.selectAll(from: users)
+    }
+}
+
+Schema(dialect: PostgreSQL()) {
+    User()
+    SelectUserByEmail()
+
+    Adapter(
+        GoSQLAdapter(packageName: "main"),
+        generateInto: .gitRoot(appending: ["generated", "go"])
+    )
+}
+```
+
+Run your schema target:
+
+```bash
+swift run MySchema
+```
+
+Passport validates the schema, compiles queries to SQL, and writes generated files through any adapters you registered.
+
+A fuller working example lives in [`Sources/PassportDemo`](Sources/PassportDemo). Run it with:
+
+```bash
+swift run PassportDemo
+```
+
+## Keys
+
+Keys are string-backed enums that name columns and query result fields. They are how Passport keeps table definitions, projections, and generated types aligned.
+
+### `TableKey`
+
+Every `Table` has an associated `Key` that conforms to `TableKey` (and therefore `ProjectionKey`). Use it for:
+
+- Declaring columns via `static func column(_ key: Key) -> Column`
+- Addressing columns on table references: `users[.email]`
+- Returning every column from a table when `ReturnType == Table.Key`
+
+```swift
+struct Post: Table {
+    enum Key: String, TableKey {
+        case id, text, userID, createdDate
+    }
+
+    static let tableName = "posts"
+
+    static func column(_ key: Key) -> Column {
+        switch key {
+        case .id: .uuid().required()
+        case .text: .string()
+        case .userID: .uuid().required().foreignKey(User.self, column: .id)
+        case .createdDate: .timezonedDate().required()
+        }
     }
 }
 ```
 
-### Run Your Schema Builder
+### `ProjectionKey`
 
-```bash
-swift run MySchemaBuilder
+Queries declare a `ReturnType: ProjectionKey`. Each case becomes a selected / returned column alias (and a field on generated result types).
+
+You can reuse a table’s `Key` as the return shape, or define a narrower projection:
+
+```swift
+enum PostSummary: String, ProjectionKey {
+    case text, userEmail
+}
 ```
 
-This will generate all your code in the configured output directories.
+Passport validates that every projection case is bound exactly once.
 
-## Roadmap
+## Tables and columns
 
-Future features under consideration:
+Tables conform to `Table` and list columns through their `Key`:
 
-- [ ] MySQL dialect support
-- [ ] SQLite dialect support
-- [ ] Python code generator
-- [ ] Rust code generator
-- [ ] Java/Kotlin code generator
-- [ ] Migration generation and versioning
-- [ ] Schema diffing and change detection
-- [ ] JOIN support in queries
-- [ ] Aggregate functions (COUNT, SUM, AVG, etc.)
-- [ ] Transactions and batch operations
-- [ ] CLI tool for schema management
+```swift
+struct UserProfile: Table {
+    enum Key: String, TableKey {
+        case id, userID, username
+    }
+
+    static let tableName = "user_profiles"
+
+    static func column(_ key: Key) -> Column {
+        switch key {
+        case .id: .uuid().required()
+        case .userID: .uuid().required().foreignKey(User.self, column: .id)
+        case .username: .string().required()
+        }
+    }
+}
+```
+
+### Column builders
+
+| Builder | Data type |
+| --- | --- |
+| `.string()` | `.string` |
+| `.uuid()` | `.uuid` |
+| `.int32()` / `.int64()` | `.integer32` / `.integer64` |
+| `.float32()` / `.float64()` | `.float32` / `.float64` |
+| `.date()` | `.date` |
+| `.timezonedDate()` | `.dateWithTimezone` |
+
+### Column modifiers
+
+Columns are nullable by default. Chain modifiers as needed:
+
+```swift
+.string().required()
+.uuid().nullable()
+.uuid().required().foreignKey(User.self, column: .id)
+```
+
+`foreignKey(_:column:)` records a SQL `REFERENCES` constraint for migrations (see [Status / WIP](#status--wip) — migration output is not written yet).
+
+## Queries
+
+Queries are types conforming to `Select`, `Insert`, `Update`, or `Delete`. Register instances in `Schema { ... }`. The type name becomes the compiled query name (and generated function name).
+
+### Select
+
+```swift
+struct SelectPostsQuery: Select {
+    enum ReturnType: String, ProjectionKey {
+        case text, userEmail
+    }
+
+    func select(query: SelectQueryBuilder<ReturnType>) {
+        let posts = query.from(Post.self, as: "posts")
+
+        let users = query.join(foreign: User.self, as: "user", kind: .inner) { user in
+            user[.id] == posts[.userID]
+        }
+
+        let email = query.argument("email", dataType: .string)
+        query.filter {
+            users[.email] == email
+        }
+
+        query.limit(10)
+        query.sort(posts[.createdDate], direction: .descending)
+
+        query.select(posts[.text], as: .text)
+        query.select(users[.email], as: .userEmail)
+    }
+}
+```
+
+Supported join kinds: `.inner`, `.left`, `.right`. Left joins mark selected join columns as optional in the return shape.
+
+### Insert
+
+```swift
+struct InsertPostQuery: Insert {
+    typealias ReturnType = Post.Key
+
+    func insert(query: InsertQueryBuilder<ReturnType>) {
+        let posts = query.into(Post.self, as: "posts")
+        let text = query.argument("text", dataType: .string)
+
+        query.insert(posts[.text], value: text)
+        query.returnAll(posts)
+    }
+}
+```
+
+Use `insertNull(_:)` to insert an explicit `NULL`.
+
+### Update
+
+```swift
+struct UpdateEmail: Update {
+    typealias ReturnType = User.Key
+
+    func update(query: UpdateQueryBuilder<User.Key>) {
+        let users = query.update(User.self, as: "users")
+        let email = query.argument("email", dataType: .string)
+
+        query.set(users[.email], value: email)
+        query.returnAll(from: users)
+    }
+}
+```
+
+Use `unset(_:)` to set a column to `NULL`.
+
+### Delete
+
+```swift
+struct DeletePost: Delete {
+    typealias ReturnType = Post.Key
+
+    func delete(query: DeleteQueryBuilder<Post.Key>) {
+        let posts = query.from(Post.self)
+        let postID = query.argument("postID", dataType: .uuid)
+
+        query.filter {
+            posts[.id] == postID
+        }
+
+        query.returnAll(from: posts)
+    }
+}
+```
+
+### Arguments and filters
+
+Declare parameters with `query.argument(_:dataType:optional:)`:
+
+```swift
+let email = query.argument("email", dataType: .string)
+let token = query.argument("token", dataType: .string, optional: true)
+```
+
+Compare values with `==`, and test nullability with `.isNull()` / `.notNull()`:
+
+```swift
+query.filter {
+    payments[.verifiedDate].isNull()
+}
+```
+
+Combine predicates with `Condition.all(...)` (AND) or `Condition.one(...)` (OR).
+
+## Nested queries
+
+Passport can nest an insert or update inside a select by embedding another query type and using it as the `from` source. The nested query becomes a CTE; its returned columns are available on the outer query.
+
+This is useful when a write should return enriched rows (for example, joining related tables after an insert).
+
+### Nested insert as a CTE
+
+Embed an `Insert` as a nested struct, then `from` it in the outer `Select`:
+
+```swift
+enum FullPayment: String, ProjectionKey {
+    case id, fromUserEmail, toUserEmail, amount, verifiedDate
+}
+
+struct InsertPayment: Select {
+    struct _Insert: Insert {
+        typealias ReturnType = Payment.Key
+
+        func insert(query: InsertQueryBuilder<Payment.Key>) {
+            let into = query.into(Payment.self)
+
+            let fromUserID = query.argument("fromUserID", dataType: .uuid)
+            let toUserID = query.argument("toUserID", dataType: .uuid)
+            let amount = query.argument("amount", dataType: .float64)
+
+            query.insert(into[.fromUserID], value: fromUserID)
+            query.insert(into[.toUserID], value: toUserID)
+            query.insert(into[.amount], value: amount)
+            query.returnAll(into)
+        }
+    }
+
+    func select(query: SelectQueryBuilder<FullPayment>) {
+        let insert = query.from(_Insert())
+
+        let fromUser = query.join(foreign: User.self, as: "fromUser", kind: .inner) { fromUser in
+            fromUser[.id] == insert[.fromUserID]
+        }
+        let toUser = query.join(foreign: User.self, as: "toUser", kind: .inner) { toUser in
+            toUser[.id] == insert[.toUserID]
+        }
+
+        query.resultTypeName("InsertedPayment")
+        query.select(insert[.id], as: .id)
+        query.select(insert[.amount], as: .amount)
+        query.select(insert[.verifiedDate], as: .verifiedDate)
+        query.select(fromUser[.email], as: .fromUserEmail)
+        query.select(toUser[.email], as: .toUserEmail)
+    }
+}
+```
+
+Compiled SQL looks like:
+
+```sql
+WITH _Insert AS (
+  INSERT INTO payments ... RETURNING ...
+)
+SELECT ... FROM _Insert AS _Insert
+INNER JOIN users AS fromUser ON ...
+INNER JOIN users AS toUser ON ...
+```
+
+Arguments declared on the nested query bubble up to the outer generated function.
+
+### Nested update
+
+The same pattern works with `Update`:
+
+```swift
+struct UnverifyPayment: Select {
+    struct Modification: Update {
+        func update(query: UpdateQueryBuilder<Payment.Key>) {
+            let paymentID = query.argument("paymentID", dataType: .uuid)
+            let payment = query.update(Payment.self)
+
+            query.filter {
+                paymentID == payment[.id]
+            }
+            query.unset(payment[.verifiedDate])
+            query.returnAll(from: payment)
+        }
+    }
+
+    func select(query: SelectQueryBuilder<FullPayment>) {
+        let result = query.from(Modification())
+
+        let fromUser = query.join(foreign: User.self, as: "fromUser", kind: .inner) { fromUser in
+            fromUser[.id] == result[.fromUserID]
+        }
+        let toUser = query.join(foreign: User.self, as: "toUser", kind: .inner) { toUser in
+            toUser[.id] == result[.toUserID]
+        }
+
+        query.select(result[.id], as: .id)
+        query.select(result[.amount], as: .amount)
+        query.select(result[.verifiedDate], as: .verifiedDate)
+        query.select(fromUser[.email], as: .fromUserEmail)
+        query.select(toUser[.email], as: .toUserEmail)
+        query.resultTypeName("UnverifiedPayment")
+    }
+}
+```
+
+### Reusing a top-level query
+
+Nested queries do not have to be private nested types. You can also pass an existing query value into `from`:
+
+```swift
+struct InsertGetPostWithEmail: Select {
+    enum ReturnType: String, ProjectionKey {
+        case text, userEmail
+    }
+
+    func select(query: SelectQueryBuilder<ReturnType>) {
+        let result = query.from(InsertPostQuery(), as: "result")
+        let users = query.join(foreign: User.self, as: "user", kind: .inner) { user in
+            user[.id] == result[.userID]
+        }
+
+        query.select(users[.email], as: .userEmail)
+        query.select(result[.text], as: .text)
+    }
+}
+```
+
+You can also attach additional CTEs with `query.with(_:as:)` and join them via `query.join(cte:as:kind:_)`.
+
+## Convenience features
+
+These helpers cut down boilerplate without changing the underlying model.
+
+| Feature | What it does |
+| --- | --- |
+| `selectAll(from:)` | Projects every case of `ReturnType` from a table when `ReturnType == Table.Key` |
+| `returnAll` / `returnAll(from:)` | Returns every table column from insert, update, or delete |
+| `resultTypeName(_:)` | Overrides the generated result type name (default is `"\(QueryName)Result"`) |
+| `argument(_:dataType:optional:)` | Declares a typed query parameter |
+| `unset(_:)` / `insertNull(_:)` | Write `NULL` on update / insert |
+| `.isNull()` / `.notNull()` | Null checks in filters |
+| `.foreignKey(_:column:)` | Declares FK relationships for migrations |
+| Join optionality | Left/right joins adjust optional return types automatically |
+
+Example using `selectAll` and a null filter:
+
+```swift
+struct GetUnverifiedPayments: Select {
+    func select(query: SelectQueryBuilder<Payment.Key>) {
+        let payments = query.from(Payment.self)
+        query.filter {
+            payments[.verifiedDate].isNull()
+        }
+        query.selectAll(from: payments)
+    }
+}
+```
+
+## Migrations
+
+> **WIP** — Migration steps compile to SQL, but Passport does not yet emit or write that SQL through adapters. Treat this API as experimental.
+
+Migrations are ordered steps inside a `Migration` builder:
+
+```swift
+Migration {
+    CreateTableMigrationStep(User.self)
+    CreateTableMigrationStep(Post.self)
+    CreateColumnMigrationStep(Post.self, column: .text)
+}
+```
+
+Today only these step kinds exist:
+
+- `CreateTableMigrationStep` — `CREATE TABLE` from the table’s keys and columns
+- `CreateColumnMigrationStep` — `ALTER TABLE ... ADD COLUMN`
+
+There is no drop/rename/index support yet, and compiled migration SQL is not passed to adapters (the `Schema` entrypoint only hands built queries to `AdapterBuilder.buildQuery`).
+
+## Schema and adapters
+
+`Schema(dialect:)` is the entrypoint. Put tables, queries, migrations, and adapters in the builder:
+
+```swift
+Schema(dialect: PostgreSQL()) {
+    User()
+    Post()
+
+    SelectPostsQuery()
+    InsertPayment()
+
+    Migration {
+        CreateTableMigrationStep(User.self)
+        CreateTableMigrationStep(Post.self)
+    }
+
+    Adapter(
+        GoSQLAdapter(packageName: "main"),
+        generateInto: .gitRoot(appending: ["generated", "go"])
+    )
+}
+```
+
+### Dialects
+
+Today Passport ships `PostgreSQL`, which compiles queries and migration steps to PostgreSQL SQL. Additional dialects are not implemented yet.
+
+### Adapters
+
+> **WIP** — Code generation is early. Only Go query helpers are generated.
+
+Adapters turn compiled queries into language-specific files. The `AdapterBuilder` protocol currently exposes `buildQuery` only (no migration hook).
+
+`GoSQLAdapter` writes Go structs and `database/sql` functions into the configured directory (for example `generated/go/model.go`), then runs `gofmt`. It does not generate table models or migration SQL files.
+
+Output locations:
+
+- `.gitRoot(appending: [...])` — walk up to the nearest `.git` directory, then append path components
+- `.currentDirectory(appending: [...])` — relative to the process working directory
+
+Implement `AdapterBuilder` to add other languages once you need them.
+
+## Project layout
+
+```
+Passport/
+├── Sources/
+│   ├── Passport/          # Library
+│   └── PassportDemo/      # End-to-end example schema
+├── Package.swift
+└── generated/             # Adapter output (e.g. Go)
+```
 
 ## Contributing
 
-Contributions are welcome! To contribute:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests for your changes
-5. Ensure all tests pass (`swift test`)
-6. Commit your changes (`git commit -m 'Add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
-
-Please ensure your code:
-- Follows Swift best practices and conventions
-- Includes appropriate documentation comments
-- Includes tests for new functionality
-- Maintains backwards compatibility when possible
-
-For major changes, please open an issue first to discuss what you would like to change.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
 
 ## License
 
-This project is available under the MIT License. See the LICENSE file for more information.
-
----
-
-**Built with Swift**
-
-Passport is built using Swift macros and the Swift Package Manager. For more information about Swift macros, see the [Swift Evolution proposal SE-0382](https://github.com/apple/swift-evolution/blob/main/proposals/0382-expression-macros.md).
+MIT. See [LICENSE](LICENSE).
