@@ -1,5 +1,5 @@
 public enum DefaultValue: Sendable {
-    case random
+    case number(Int), boolean(Bool)
 }
 
 public enum Nullability: Sendable {
@@ -12,6 +12,7 @@ public enum Nullability: Sendable {
 
 public enum DataType: Sendable {
     case blob,
+         boolean,
          string,
          integer32,
          integer64,

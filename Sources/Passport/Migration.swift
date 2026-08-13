@@ -1,13 +1,15 @@
 import Foundation
 
 public enum MigrationStep: Sendable {
-    case createTable(CreateTableMigrationStep),
-         createColumn(CreateColumnMigrationStep)
+    case createTable(CreateTable),
+         createColumn(AddColumn),
+         createIndex(IndexDefinition)
     
     var name: String {
         switch self {
         case .createTable(let table): "create-\(table.table.tableName)"
         case .createColumn(let column): "alter-\(column.table.tableName)-create-\(column.name)"
+        case .createIndex(let index): "createindex-\(index.name)-\(index.tableName)"
         }
     }
 }
@@ -16,7 +18,7 @@ public protocol IntoMigrationStep {
     func intoMigrationStep() -> MigrationStep
 }
 
-public struct CreateTableMigrationStep: IntoMigrationStep, Sendable {
+public struct CreateTable: IntoMigrationStep, Sendable {
     public let table: any Table.Type
     public let columns: [ColumnSnapshot]
     
@@ -35,7 +37,7 @@ public struct CreateTableMigrationStep: IntoMigrationStep, Sendable {
     }
 }
 
-public struct CreateColumnMigrationStep: IntoMigrationStep, Sendable {
+public struct AddColumn: IntoMigrationStep, Sendable {
     public let table: any Table.Type
     public let column: Column
     public let name: String
@@ -51,12 +53,23 @@ public struct CreateColumnMigrationStep: IntoMigrationStep, Sendable {
     }
 }
 
+public struct CreateIndex: IntoMigrationStep, Sendable {
+    public let index: IndexDefinition
+    
+    public init<I: Index>(_ index: I) {
+        self.index = .init(configuration: index)
+    }
+    
+    public func intoMigrationStep() -> MigrationStep {
+        return .createIndex(index)
+    }
+}
+
+
 public struct Migration: Sendable, IntoSchemaItem {
-    let location: FileLocation
     let steps: [MigrationStep]
     
-    public init(location: FileLocation, @MigrationStepBuilder _ builder: () -> [MigrationStep]) {
-        self.location = location
+    public init(@MigrationStepBuilder _ builder: () -> [MigrationStep]) {
         self.steps = builder()
     }
     

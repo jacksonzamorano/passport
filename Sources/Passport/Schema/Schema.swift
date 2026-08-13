@@ -8,6 +8,7 @@ import Foundation
 
 public func Schema(
     dialect: Dialect,
+    migrationLocation: FileLocation = .gitRoot(appending: []),
     @SchemaBuilder schemaItems: () -> [SchemaItem]
 ) {
     let schema = SchemaRepresentation(
@@ -55,12 +56,12 @@ public func Schema(
             
             let migrationCode = migrationSQL.joined(separator: "\n\n")
             
-            let rootURL = try migration.location.url()
+            let rootURL = try migrationLocation.url()
             if !FileManager.default.fileExists(atPath: rootURL.path()) {
                 try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
             }
             
-            let url = try migration.location.url().appending(path: String(format: "%05d.sql", idx+1))
+            let url = rootURL.appending(path: String(format: "%05d.sql", idx+1))
             try migrationCode.write(to: url, atomically: true, encoding: .utf8)
         } catch {
             if let error = error as? DialectError {

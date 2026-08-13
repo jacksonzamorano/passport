@@ -24,13 +24,14 @@ public final class PostgreSQL: Sendable, Dialect {
         case .right: "RIGHT JOIN"
         }
     }
-    private func conditionValue(_ cv: QueryValue, argumentOffset: Int) throws(DialectError) -> String {
+    private func conditionValue(_ cv: QueryValue, argumentOffset: Int, fullyQualifyName: Bool = true) throws(DialectError) -> String {
         switch cv {
-        case .column(let cr): "\(cr.sourceName).\(cr.columnName)"
+        case .column(let cr): fullyQualifyName ? "\"\(cr.sourceName)\".\"\(cr.columnName)\"" : "\"\(cr.columnName)\""
         case .constant(let cn):
             switch cn {
             case .integer(let i): "\(i)"
             case .string(let s): "'\(s.replacingOccurrences(of: "'", with: "\\'"))'"
+            case .boolean(let b): "\(b ? "TRUE" : "FALSE")"
             }
         case .argument(let arg): "$\(arg.index+1+argumentOffset)"
         case .function(let fun): try functionDefinition(fun, argumentOffset: argumentOffset)
@@ -121,6 +122,12 @@ public final class PostgreSQL: Sendable, Dialect {
             }
             return "(\(subconditions.joined(separator: " OR ")))"
         case .equals(let a, let b): return "\(try conditionValue(a, argumentOffset: argumentOffset)) = \(try conditionValue(b, argumentOffset: argumentOffset))"
+        case .gte(let a, let b): return "\(try conditionValue(a, argumentOffset: argumentOffset)) >= \(try conditionValue(b, argumentOffset: argumentOffset))"
+        case .lte(let a, let b): return "\(try conditionValue(a, argumentOffset: argumentOffset)) <= \(try conditionValue(b, argumentOffset: argumentOffset))"
+        case .greaterThan(let a, let b):
+            return "\(try conditionValue(a, argumentOffset: argumentOffset)) > \(try conditionValue(b, argumentOffset: argumentOffset))"
+        case .lessThan(let a, let b):
+            return "\(try conditionValue(a, argumentOffset: argumentOffset)) < \(try conditionValue(b, argumentOffset: argumentOffset))"
         case .null(let a): return "\(try conditionValue(a ,argumentOffset: argumentOffset)) IS NULL"
         case .notNull(let a): return "\(try conditionValue(a, argumentOffset: argumentOffset)) IS NOT NULL"
         }
@@ -145,6 +152,7 @@ public final class PostgreSQL: Sendable, Dialect {
     private func convertDataType(_ dataType: DataType) throws(DialectError) -> String {
         switch dataType {
         case .blob: "BYTEA"
+        case .boolean: "BOOLEAN"
         case .string: "TEXT"
         case .uuid: "UUID"
         case .integer32: "INT4"
@@ -156,7 +164,7 @@ public final class PostgreSQL: Sendable, Dialect {
         }
     }
     private func buildColumn(_ column: Column, name: String) throws(DialectError) -> String {
-        var parts: [String] = [name]
+        var parts: [String] = ["\"\(name)\""]
         parts.append(try convertDataType(column.dataType))
         if column.nullability == .notnullable {
             parts.append("NOT NULL")
@@ -164,11 +172,18 @@ public final class PostgreSQL: Sendable, Dialect {
         if column.constraints.primaryKey {
             parts.append("PRIMARY KEY")
         }
+        if let defaultValue = column.defaultValue {
+            parts.append("DEFAULT")
+            switch defaultValue {
+            case .number(let num): parts.append("\(num)")
+            case .boolean(let bool): parts.append(bool ? "TRUE" : "FALSE")
+            }
+        }
         if column.constraints.unique {
             parts.append("UNIQUE")
         }
         if let foreignKey = column.constraints.foreignKey {
-            parts.append("REFERENCES \(foreignKey.tableName)(\(foreignKey.columnName))")
+            parts.append("REFERENCES \"\(foreignKey.tableName)\"(\"\(foreignKey.columnName)\")")
         }
         return parts.joined(separator: " ")
     }
@@ -207,7 +222,7 @@ public final class PostgreSQL: Sendable, Dialect {
 
         var projectionString: [String] = []
         for projection in query.projections {
-            projectionString.append("\(try conditionValue(projection.column, argumentOffset: context.argumentCount)) AS \(projection.alias)")
+            projectionString.append("\(try conditionValue(projection.column, argumentOffset: context.argumentCount)) AS \"\(projection.alias)\"")
         }
         queryComponents.append(projectionString.joined(separator: ", "))
         
@@ -343,6 +358,37 @@ public final class PostgreSQL: Sendable, Dialect {
             return """
                 ALTER TABLE \(migration.table.tableName) ADD COLUMN \(try buildColumn(migration.column, name: migration.name));
                 """
+        case .createIndex(let index):
+            var indexString = ["CREATE INDEX"]
+            indexString.append(index.name)
+            indexString.append("ON \(index.tableName)")
+            switch index.algorithm {
+            case .auto:
+                break
+            case .btree:
+                indexString.append("WITH btree")
+            case .hash:
+                indexString.append("WITH hash")
+            }
+            
+            var fieldString: [String] = []
+            for field in index.fields {
+                let value = try conditionValue(field, argumentOffset: 0, fullyQualifyName: false)
+                fieldString.append(value)
+            }
+            indexString.append("(\(fieldString.joined(separator: ", ")))")
+            
+            if !index.filters.isEmpty {
+                indexString.append("WHERE")
+                var conditions = [String]()
+                for filter in index.filters {
+                    let condition = try conditionToString(filter, argumentOffset: 0)
+                    conditions.append(condition)
+                }
+                indexString.append(conditions.joined(separator: " AND "))
+            }
+            
+            return indexString.joined(separator: " ")
         }
     }
 }

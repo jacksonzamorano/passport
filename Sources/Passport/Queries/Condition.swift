@@ -4,6 +4,10 @@ public indirect enum Condition: Sendable {
     case and([Condition]),
          or([Condition]),
          equals(QueryValue, QueryValue),
+         greaterThan(QueryValue, QueryValue),
+         lessThan(QueryValue, QueryValue),
+         gte(QueryValue, QueryValue),
+         lte(QueryValue, QueryValue),
          null(QueryValue),
          notNull(QueryValue)
     
@@ -48,7 +52,11 @@ public indirect enum QueryValue: Sendable {
     }
 }
 
-public indirect enum QueryFunction: Sendable {
+public func && (lhs: Condition, rhs: Condition)  -> Condition {
+    return .and([lhs, rhs])
+}
+
+public indirect enum QueryFunction: Sendable, IntoConditionValue {
     case lower(QueryValue),
          upper(QueryValue),
          add(QueryValue, QueryValue),
@@ -66,16 +74,25 @@ public indirect enum QueryFunction: Sendable {
         case .divide(_, _): "divide"
         }
     }
+    
+    public func toConditionValue() -> QueryValue {
+        .function(self)
+    }
+}
+public func +(lhs: any IntoConditionValue, rhs: any IntoConditionValue) -> QueryFunction {
+    .add(lhs.toConditionValue(), rhs.toConditionValue())
 }
 
 public indirect enum ConditionConstant: Sendable {
     case string(String),
-         integer(Int)
+         integer(Int),
+         boolean(Bool)
     
     var dataType: DeclaredType {
         switch self {
         case .integer(_): .init(dataType: .integer64, optional: false)
         case .string(_): .init(dataType: .string, optional: false)
+        case .boolean(_): .init(dataType: .boolean, optional: false)
         }
     }
 }
@@ -94,6 +111,18 @@ extension IntoConditionValue {
 public func ==(lhs: any IntoConditionValue, rhs: any IntoConditionValue) -> Condition {
     return .equals(lhs.toConditionValue(), rhs.toConditionValue())
 }
+public func >=(lhs: any IntoConditionValue, rhs: any IntoConditionValue) -> Condition {
+    return .gte(lhs.toConditionValue(), rhs.toConditionValue())
+}
+public func <=(lhs: any IntoConditionValue, rhs: any IntoConditionValue) -> Condition {
+    return .lte(lhs.toConditionValue(), rhs.toConditionValue())
+}
+public func >(lhs: any IntoConditionValue, rhs: any IntoConditionValue) -> Condition {
+    return .greaterThan(lhs.toConditionValue(), rhs.toConditionValue())
+}
+public func <(lhs: any IntoConditionValue, rhs: any IntoConditionValue) -> Condition {
+    return .lessThan(lhs.toConditionValue(), rhs.toConditionValue())
+}
 public func isNull(lhs: any IntoConditionValue) -> Condition {
     return .null(lhs.toConditionValue())
 }
@@ -108,5 +137,10 @@ extension String: IntoConditionValue {
 extension Int: IntoConditionValue {
     public func toConditionValue() -> QueryValue {
         .constant(.integer(self))
+    }
+}
+extension Bool: IntoConditionValue {
+    public func toConditionValue() -> QueryValue {
+        .constant(.boolean(self))
     }
 }

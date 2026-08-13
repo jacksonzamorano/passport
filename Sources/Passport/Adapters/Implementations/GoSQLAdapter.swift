@@ -10,6 +10,14 @@ public final class GoSQLAdapter: AdapterBuilder {
         self.packageName = packageName
     }
     
+    private var requiredContents: String {
+        """
+        type Queryable interface {
+            Query(query string, args ...any) (*sql.Rows, error)
+        }
+        """
+    }
+    
     public func goify(_ name: String) -> String {
         if let first = name.first, first.isLowercase {
             let rest = name.dropFirst()
@@ -32,6 +40,7 @@ public final class GoSQLAdapter: AdapterBuilder {
         case .float32: "float32"
         case .float64: "float64"
         case .blob: "[]byte"
+        case .boolean: "bool"
         case .date, .dateWithTimezone:
             {
                 file.require("time")
@@ -52,6 +61,7 @@ public final class GoSQLAdapter: AdapterBuilder {
     public func buildQuery(query: BuiltQuery, inContext context: AdapterContext) throws(AdapterError) {
         let file = context.file(
             path: "model.go",
+            initialContents: requiredContents,
             prefix: "package \(packageName)",
             after: ["gofmt", "-w", "."]
         )
@@ -72,9 +82,9 @@ public final class GoSQLAdapter: AdapterBuilder {
                 \(returnColumnString.joined(separator: "\n\t"))
             }
             
-            func \(goify(query.queryName))(database *sql.DB, \(argumentsString.joined(separator: ", "))) ([]\(query.queryReturnTypeName), error) {
+            func \(goify(query.queryName))(database Queryable, \(argumentsString.joined(separator: ", "))) ([]\(query.queryReturnTypeName), error) {
                 var results []\(query.queryReturnTypeName)
-                rows, err := database.Query("\(query.query)", \(query.arguments.map{ $0.name }.joined(separator: ", ")))
+                rows, err := database.Query("\(query.query.replacingOccurrences(of: "\"", with: "\\\""))", \(query.arguments.map{ $0.name }.joined(separator: ", ")))
                 if err != nil {
                     return results, err
                 }
