@@ -37,4 +37,8 @@ public enum DialectErrorCode: Int, Sendable {
 public struct DialectError: Error {
     let code: DialectErrorCode
     let context: String
+    
+    var description: String {
+        "[D\(code.codeString)] \(code.description): \(context)"
+    }
 }

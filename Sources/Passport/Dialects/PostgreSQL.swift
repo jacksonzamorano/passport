@@ -161,7 +161,13 @@ public final class PostgreSQL: Sendable, Dialect {
         if column.nullability == .notnullable {
             parts.append("NOT NULL")
         }
-        if let foreignKey = column.foreignKey {
+        if column.constraints.primaryKey {
+            parts.append("PRIMARY KEY")
+        }
+        if column.constraints.unique {
+            parts.append("UNIQUE")
+        }
+        if let foreignKey = column.constraints.foreignKey {
             parts.append("REFERENCES \(foreignKey.tableName)(\(foreignKey.columnName))")
         }
         return parts.joined(separator: " ")
@@ -330,12 +336,12 @@ public final class PostgreSQL: Sendable, Dialect {
             
             return """
             CREATE TABLE \(migration.table.tableName) (
-                \(columns.joined(separator: ",\n\t"))
-            )
+              \(columns.joined(separator: ",\n  "))
+            );
             """
         case .createColumn(let migration):
             return """
-                ALTER TABLE \(migration.table.tableName) ADD COLUMN \(try buildColumn(migration.column, name: migration.name))
+                ALTER TABLE \(migration.table.tableName) ADD COLUMN \(try buildColumn(migration.column, name: migration.name));
                 """
         }
     }

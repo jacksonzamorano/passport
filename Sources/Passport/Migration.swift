@@ -52,9 +52,11 @@ public struct CreateColumnMigrationStep: IntoMigrationStep, Sendable {
 }
 
 public struct Migration: Sendable, IntoSchemaItem {
+    let location: FileLocation
     let steps: [MigrationStep]
     
-    public init(@MigrationStepBuilder _ builder: () -> [MigrationStep]) {
+    public init(location: FileLocation, @MigrationStepBuilder _ builder: () -> [MigrationStep]) {
+        self.location = location
         self.steps = builder()
     }
     

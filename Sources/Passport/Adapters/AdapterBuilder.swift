@@ -7,7 +7,7 @@ public protocol AdapterBuilder {
     func buildQuery(query: BuiltQuery, inContext context: AdapterContext) throws(AdapterError)
 }
 
-public enum AdapterLocation {
+public enum FileLocation: Sendable {
     case gitRoot(appending: [String]),
          currentDirectory(appending: [String])
 
@@ -42,7 +42,7 @@ public struct Adapter: IntoSchemaItem {
     let builder: AdapterBuilder
     let context: AdapterContext
     
-    public init(_ builder: AdapterBuilder, generateInto location: AdapterLocation) {
+    public init(_ builder: AdapterBuilder, generateInto location: FileLocation) {
         self.builder = builder
         self.context = .init(projectPath: try! location.url())
     }

@@ -46,11 +46,28 @@ public func Schema(
         }
     }
     
-//    for query in build.queries {
-//        print(query.queryName)
-//        for returnColumn in query.returnColumns {
-//            print("\t\(returnColumn.name) -> \(returnColumn.fullDataType.dataType) (\(returnColumn.fullDataType.optional ? "Optional" : "Required"))")
-//        }
-//        print("\n\tQuery: \(query.query)\n---\n")
-//    }
+    for (idx, migration) in schema.migrations.enumerated() {
+        do {
+            var migrationSQL = [String]()
+            for step in migration.steps {
+                migrationSQL.append(try dialect.buildMigrationStep(step: step))
+            }
+            
+            let migrationCode = migrationSQL.joined(separator: "\n\n")
+            
+            let rootURL = try migration.location.url()
+            if !FileManager.default.fileExists(atPath: rootURL.path()) {
+                try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+            }
+            
+            let url = try migration.location.url().appending(path: String(format: "%05d.sql", idx+1))
+            try migrationCode.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            if let error = error as? DialectError {
+                print(error.description)
+            } else {
+                print(error.localizedDescription)
+            }
+        }
+    }
 }
