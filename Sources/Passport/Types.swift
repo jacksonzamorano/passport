@@ -1,5 +1,5 @@
 public enum DefaultValue: Sendable {
-    case number(Int), boolean(Bool)
+    case number(Int), boolean(Bool), string(String)
 }
 
 public enum Nullability: Sendable {

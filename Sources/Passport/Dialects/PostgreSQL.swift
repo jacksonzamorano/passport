@@ -177,6 +177,7 @@ public final class PostgreSQL: Sendable, Dialect {
             switch defaultValue {
             case .number(let num): parts.append("\(num)")
             case .boolean(let bool): parts.append(bool ? "TRUE" : "FALSE")
+            case .string(let str): parts.append("'\(str)'")
             }
         }
         if column.constraints.unique {
@@ -199,7 +200,7 @@ public final class PostgreSQL: Sendable, Dialect {
             var cteString = [String]()
             for (idx, cte) in query.base.ctes.enumerated() {
                 try checkKeyword(cte.identity.name, context: "CTE #\(idx+1)")
-                cteString.append("\(cte.identity.name) AS (\(try self.buildQuery(query: cte.query, context: context)))")
+                cteString.append("\"\(cte.identity.name)\" AS (\(try self.buildQuery(query: cte.query, context: context)))")
             }
             queryComponents.append(cteString.joined(separator: ", "))
         }
@@ -226,12 +227,12 @@ public final class PostgreSQL: Sendable, Dialect {
         }
         queryComponents.append(projectionString.joined(separator: ", "))
         
-        queryComponents.append("FROM \(query.target!.realName) AS \(query.target!.alias)")
+        queryComponents.append("FROM \"\(query.target!.realName)\" AS \"\(query.target!.alias)\"")
         
         for join in query.joins {
             let joinKind = try joinKindToString(joinKind: join.kind)
             let joinCondition = try conditionToString(join.condition, argumentOffset: context.argumentCount)
-            let str = "\(joinKind) \(self.sourceToString(join.source)) AS \(join.alias) ON \(joinCondition)"
+            let str = "\(joinKind) \"\(self.sourceToString(join.source))\" AS \"\(join.alias)\" ON \(joinCondition)"
             queryComponents.append(str)
         }
         
@@ -242,7 +243,7 @@ public final class PostgreSQL: Sendable, Dialect {
         if !query.sorts.isEmpty {
             queryComponents.append("ORDER BY")
             queryComponents.append(query.sorts.map{
-                "\($0.column.sourceName).\($0.column.columnName) \(sortDirection($0.direction))"
+                "\"\($0.column.sourceName)\".\"\($0.column.columnName)\" \(sortDirection($0.direction))"
             }.joined(separator: ", "))
         }
         
@@ -257,9 +258,9 @@ public final class PostgreSQL: Sendable, Dialect {
     }
     
     public func buildInsertQuery(query: InsertQuery, context: RenderContext) throws(DialectError) -> String {
-        var insertQueryComponents = ["INSERT INTO \(query.target!.realName) AS \(query.target!.alias)"]
+        var insertQueryComponents = ["INSERT INTO \"\(query.target!.realName)\" AS \"\(query.target!.alias)\""]
         let insertColumnNames = query.insertFields.map {
-            "\($0.column.columnName)"
+            "\"\($0.column.columnName)\""
         }.joined(separator: ", ")
         insertQueryComponents.append("(\(insertColumnNames)) VALUES")
         
@@ -280,7 +281,7 @@ public final class PostgreSQL: Sendable, Dialect {
         
         var projections: [String] = []
         for projection in query.projections {
-            projections.append("\(try conditionValue(projection.column, argumentOffset: context.argumentCount)) AS \(projection.alias)")
+            projections.append("\(try conditionValue(projection.column, argumentOffset: context.argumentCount)) AS \"\(projection.alias)\"")
         }
         
         insertQueryComponents.append("RETURNING \(projections.joined(separator: ", "))")
@@ -288,7 +289,7 @@ public final class PostgreSQL: Sendable, Dialect {
     }
     
     public func buildUpdateQuery(query: UpdateQuery, context: RenderContext) throws(DialectError) -> String {
-        var queryComponents = ["UPDATE \(query.target!.realName) AS \(query.target!.alias)"]
+        var queryComponents = ["UPDATE \"\(query.target!.realName)\" AS \"\(query.target!.alias)\""]
         if !query.setFields.isEmpty {
             queryComponents.append("SET")
             var sets = [String]()
@@ -299,7 +300,7 @@ public final class PostgreSQL: Sendable, Dialect {
                 } else {
                     fValue = "NULL"
                 }
-                sets.append("\(field.column.columnName) = \(fValue)")
+                sets.append("\"\(field.column.columnName)\" = \(fValue)")
             }
             queryComponents.append(sets.joined(separator: ", "))
         }
@@ -322,7 +323,7 @@ public final class PostgreSQL: Sendable, Dialect {
     }
     
     public func buildDeleteQuery(query: DeleteQuery, context: RenderContext) throws(DialectError) -> String {
-        var queryComponents = ["DELETE FROM \(query.target!.realName) AS \(query.target!.alias)"]
+        var queryComponents = ["DELETE FROM \"\(query.target!.realName)\" AS \"\(query.target!.alias)\""]
 
         if let filterString = try buildFilters(query.filters, argumentOffset: context.argumentCount) {
             queryComponents.append(filterString)

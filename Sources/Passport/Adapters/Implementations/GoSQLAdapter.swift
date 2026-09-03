@@ -83,7 +83,7 @@ public final class GoSQLAdapter: AdapterBuilder {
             }
             
             func \(goify(query.queryName))(database Queryable, \(argumentsString.joined(separator: ", "))) ([]\(query.queryReturnTypeName), error) {
-                var results []\(query.queryReturnTypeName)
+                results := []\(query.queryReturnTypeName){}
                 rows, err := database.Query("\(query.query.replacingOccurrences(of: "\"", with: "\\\""))", \(query.arguments.map{ $0.name }.joined(separator: ", ")))
                 if err != nil {
                     return results, err
